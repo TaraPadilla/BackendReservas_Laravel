@@ -15,7 +15,7 @@ class SedeController extends Controller
 
     public function activas()
     {
-        return Sede::with(['restaurante', 'mesas', 'combinacionesMesas'])
+        return Sede::with(['restaurante'])
             ->where('activo', true)
             ->get();
     }

@@ -90,7 +90,6 @@ class MesaController extends Controller
                 'duracion_turno_minutos' => 'required|integer|min:30',
                 'ubicacion' => 'required|in:interior,exterior',
                 'forma' => 'required|in:rectangulo,cuadrado,circulo,ovalada',
-                'estado' => 'required|in:disponible,reservada,ocupada,mantenimiento',
                 'posicion_x' => 'nullable|numeric',
                 'posicion_y' => 'nullable|numeric',
                 'activa' => 'boolean'
@@ -181,7 +180,9 @@ class MesaController extends Controller
         try {
             $this->logInfo('Obteniendo mesas por sede', ['sede_id' => $sedeId]);
 
-            $mesas = Mesa::where('sede_id', $sedeId)
+             //Obtener las mesas activas de la sede
+             $mesas = Mesa::where('sede_id', $sedeId)
+                ->where('activa', true)
                 ->with(['sede', 'horarios'])
                 ->get();
 

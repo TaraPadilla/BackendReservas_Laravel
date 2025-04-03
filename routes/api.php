@@ -39,7 +39,9 @@ Route::get('reservas/verificar-disponibilidad', [ReservaController::class, 'veri
     // Rutas para Mesas
     Route::apiResource('mesas', MesaController::class);
     Route::get('/sedes/{sede}/disponibilidad', [MesaController::class, 'obtenerSimulacionDisponibilidad']);
-
+    Route::get('/mesas/sede/{sede}', [MesaController::class, 'porSede']);
+    //Ruta para actualizar una mesa
+    Route::put('/mesas/{mesa}', [MesaController::class, 'update']);
     // Rutas para Combinaciones de Mesas
     Route::apiResource('combinaciones-mesas', CombinacionMesaController::class);
     
