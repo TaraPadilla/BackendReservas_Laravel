@@ -78,10 +78,12 @@ Route::get('reservas/verificar-disponibilidad', [ReservaController::class, 'veri
     Route::get('bloqueos-mesas/por-rango', [BloqueoMesaController::class, 'porRangoFechas']);
 
     // Rutas para Horarios Semanales
-    Route::apiResource('horarios-semanales', HorarioSemanalController::class);
-    Route::post('horarios-semanales/inicializar', [HorarioSemanalController::class, 'initialize']);
+    Route::get('horarios-semanales/{sede_id?}', [HorarioSemanalController::class, 'index']);
+    Route::apiResource('horarios-semanales', HorarioSemanalController::class)->except(['index']);
+    Route::put('horarios-semanales/{id}', [HorarioSemanalController::class, 'update']);
+    Route::post('horarios-semanales/inicializar/{sede_id}', [HorarioSemanalController::class, 'initialize']);
     Route::post('horarios-semanales/verificar-servicio', [HorarioSemanalController::class, 'verificarHorarioServicio']);
-
+    
     // Rutas del Motor de Asignación
     Route::prefix('motor')->group(function () {
         Route::post('buscar-mesas', [ReservaController::class, 'buscarMesasDisponibles']);

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HorarioSemanal extends Model
 {
@@ -12,6 +13,7 @@ class HorarioSemanal extends Model
     protected $table = 'horarios_semanales';
     
     protected $fillable = [
+        'sede_id',
         'day_of_week',
         'is_closed',
         'lunch_start',
@@ -21,6 +23,7 @@ class HorarioSemanal extends Model
     ];
 
     protected $casts = [
+        'sede_id' => 'integer',
         'day_of_week' => 'integer',
         'is_closed' => 'boolean',
         'lunch_start' => 'datetime:H:i',
@@ -34,6 +37,14 @@ class HorarioSemanal extends Model
     protected $attributes = [
         'is_closed' => false
     ];
+
+    /**
+     * Obtiene la sede a la que pertenece este horario
+     */
+    public function sede(): BelongsTo
+    {
+        return $this->belongsTo(Sede::class);
+    }
 
     /**
      * Obtiene el nombre del día de la semana

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\HorarioSemanal;
+use App\Models\Sede;
 use App\Traits\LogTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -15,11 +16,19 @@ class HorarioSemanalController extends Controller
     /**
      * Obtiene todos los horarios semanales
      */
-    public function index()
+    public function index($sede_id = null)
     {
         try {
             $this->logInfo('Obteniendo lista de horarios semanales');
-            $horarios = HorarioSemanal::orderBy('day_of_week')->get();
+            
+            $query = HorarioSemanal::with('sede')->orderBy('day_of_week');
+            
+            // Filtrar por sede si se proporciona
+            if ($sede_id) {
+                $query->where('sede_id', $sede_id);
+            }
+            
+            $horarios = $query->get();
             $this->logInfo('Lista de horarios obtenida', ['total' => $horarios->count()]);
             return response()->json($horarios);
         } catch (\Exception $e) {
@@ -37,7 +46,10 @@ class HorarioSemanalController extends Controller
             $this->logInfo('Creando nuevo horario semanal', $request->all());
 
             $validated = $request->validate([
-                'day_of_week' => ['required', 'integer', 'between:0,6', Rule::unique('horarios_semanales')],
+                'sede_id' => 'required|exists:sedes,id',
+                'day_of_week' => ['required', 'integer', 'between:0,6', Rule::unique('horarios_semanales')->where(function ($query) use ($request) {
+                    return $query->where('sede_id', $request->sede_id);
+                })],
                 'is_closed' => 'required|boolean',
                 'lunch_start' => 'nullable|required_if:is_closed,false|date_format:H:i',
                 'lunch_end' => 'nullable|required_if:is_closed,false|date_format:H:i|after:lunch_start',
@@ -80,7 +92,7 @@ class HorarioSemanalController extends Controller
     {
         try {
             $this->logInfo('Obteniendo detalles de horario semanal', ['id' => $horarioSemanal->id]);
-            return response()->json($horarioSemanal);
+            return response()->json($horarioSemanal->load('sede'));
         } catch (\Exception $e) {
             $this->logError('Error al obtener detalles de horario semanal', $e);
             return response()->json(['message' => 'Error al obtener los detalles del horario semanal'], 500);
@@ -90,13 +102,31 @@ class HorarioSemanalController extends Controller
     /**
      * Actualiza un horario semanal existente
      */
-    public function update(Request $request, HorarioSemanal $horarioSemanal)
+    public function update(Request $request, $id)
     {
         try {
-            $this->logInfo('Actualizando horario semanal', ['id' => $horarioSemanal->id, 'data' => $request->all()]);
+            $horarioSemanal = HorarioSemanal::findOrFail($id);
+            $this->logInfo('Actualizando horario semanal', ['id' => $id, 'data' => $request->all()]);
+
+            // Solo verificar duplicados si se está cambiando la sede o el día de la semana
+            if ($request->sede_id != $horarioSemanal->sede_id || $request->day_of_week != $horarioSemanal->day_of_week) {
+                // Verificar si ya existe un horario con la misma sede y día de la semana
+                $horarioExistente = HorarioSemanal::where('sede_id', $request->sede_id)
+                    ->where('day_of_week', $request->day_of_week)
+                    ->where('id', '!=', $id)
+                    ->first();
+
+                if ($horarioExistente) {
+                    return response()->json([
+                        'message' => 'Ya existe un horario para esta sede y día de la semana',
+                        'horario_existente' => $horarioExistente
+                    ], 422);
+                }
+            }
 
             $validated = $request->validate([
-                'day_of_week' => ['required', 'integer', 'between:0,6', Rule::unique('horarios_semanales')->ignore($horarioSemanal->id)],
+                'sede_id' => 'required|exists:sedes,id',
+                'day_of_week' => 'required|integer|between:0,6',
                 'is_closed' => 'required|boolean',
                 'lunch_start' => 'nullable|required_if:is_closed,false|date_format:H:i',
                 'lunch_end' => 'nullable|required_if:is_closed,false|date_format:H:i|after:lunch_start',
@@ -124,8 +154,8 @@ class HorarioSemanalController extends Controller
 
             $horarioSemanal->update($validated);
             
-            $this->logInfo('Horario semanal actualizado exitosamente', ['id' => $horarioSemanal->id]);
-            return response()->json($horarioSemanal);
+            $this->logInfo('Horario semanal actualizado exitosamente', ['id' => $id]);
+            return response()->json($horarioSemanal->load('sede'));
         } catch (\Exception $e) {
             $this->logError('Error al actualizar horario semanal', $e);
             return response()->json(['message' => 'Error al actualizar el horario semanal: ' . $e->getMessage()], 500);
@@ -151,15 +181,18 @@ class HorarioSemanalController extends Controller
     /**
      * Inicializa los horarios semanales con valores por defecto
      */
-    public function initialize()
+    public function initialize($sede_id)
     {
         try {
-            $this->logInfo('Inicializando horarios semanales');
+            $this->logInfo('Inicializando horarios semanales', ['sede_id' => $sede_id]);
+            
+            // Verificar que la sede existe
+            $sede = Sede::findOrFail($sede_id);
             
             DB::beginTransaction();
             
-            // Eliminar horarios existentes
-            HorarioSemanal::truncate();
+            // Eliminar horarios existentes para esta sede
+            HorarioSemanal::where('sede_id', $sede_id)->delete();
             
             // Crear horarios por defecto para cada día de la semana
             $defaultHorarios = [
@@ -167,10 +200,12 @@ class HorarioSemanalController extends Controller
                 // Sábado: almuerzo 13:00-16:00, cena 20:00-00:00
                 // Domingo: cerrado
                 [
+                    'sede_id' => $sede_id,
                     'day_of_week' => 0, // Domingo
                     'is_closed' => true
                 ],
                 [
+                    'sede_id' => $sede_id,
                     'day_of_week' => 1, // Lunes
                     'is_closed' => false,
                     'lunch_start' => '12:00',
@@ -179,6 +214,7 @@ class HorarioSemanalController extends Controller
                     'dinner_end' => '23:00'
                 ],
                 [
+                    'sede_id' => $sede_id,
                     'day_of_week' => 2, // Martes
                     'is_closed' => false,
                     'lunch_start' => '12:00',
@@ -187,6 +223,7 @@ class HorarioSemanalController extends Controller
                     'dinner_end' => '23:00'
                 ],
                 [
+                    'sede_id' => $sede_id,
                     'day_of_week' => 3, // Miércoles
                     'is_closed' => false,
                     'lunch_start' => '12:00',
@@ -195,6 +232,7 @@ class HorarioSemanalController extends Controller
                     'dinner_end' => '23:00'
                 ],
                 [
+                    'sede_id' => $sede_id,
                     'day_of_week' => 4, // Jueves
                     'is_closed' => false,
                     'lunch_start' => '12:00',
@@ -203,6 +241,7 @@ class HorarioSemanalController extends Controller
                     'dinner_end' => '23:00'
                 ],
                 [
+                    'sede_id' => $sede_id,
                     'day_of_week' => 5, // Viernes
                     'is_closed' => false,
                     'lunch_start' => '12:00',
@@ -211,6 +250,7 @@ class HorarioSemanalController extends Controller
                     'dinner_end' => '23:00'
                 ],
                 [
+                    'sede_id' => $sede_id,
                     'day_of_week' => 6, // Sábado
                     'is_closed' => false,
                     'lunch_start' => '13:00',
@@ -226,7 +266,7 @@ class HorarioSemanalController extends Controller
             
             DB::commit();
             
-            $this->logInfo('Horarios semanales inicializados exitosamente');
+            $this->logInfo('Horarios semanales inicializados exitosamente', ['sede_id' => $sede_id]);
             return response()->json(['message' => 'Horarios semanales inicializados correctamente']);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -241,61 +281,61 @@ class HorarioSemanalController extends Controller
     public function verificarHorarioServicio(Request $request)
     {
         try {
-            $this->logInfo('Verificando horario de servicio', $request->all());
-
             $validated = $request->validate([
+                'sede_id' => 'required|exists:sedes,id',
                 'fecha' => 'required|date',
-                'hora' => 'required|date_format:H:i'
+                'hora' => 'nullable|date_format:H:i'
             ]);
-
-            // Obtener el día de la semana (0 = Domingo, 1 = Lunes, ..., 6 = Sábado)
+    
             $fecha = \Carbon\Carbon::parse($validated['fecha']);
-            $dayOfWeek = $fecha->dayOfWeek;
-            $hora = $validated['hora'];
-
-            // Obtener el horario para ese día
-            $horario = HorarioSemanal::where('day_of_week', $dayOfWeek)->first();
-
-            if (!$horario) {
+            $horario = HorarioSemanal::where('sede_id', $validated['sede_id'])
+                ->where('day_of_week', $fecha->dayOfWeek)
+                ->first();
+    
+            if (!$horario || $horario->is_closed) {
                 return response()->json([
                     'dentro_horario' => false,
-                    'mensaje' => 'No hay horario definido para este día'
+                    'mensaje' => 'El local está cerrado o sin horario definido ese día'
                 ]);
             }
-
-            // Si está cerrado, no hay servicio
-            if ($horario->is_closed) {
+    
+            if (empty($validated['hora'])) {
                 return response()->json([
-                    'dentro_horario' => false,
-                    'mensaje' => 'El local está cerrado este día'
+                    'dentro_horario' => true,
+                    'mensaje' => 'El local está abierto ese día',
+                    'horario' => [
+                        'almuerzo' => [$horario->lunch_start, $horario->lunch_end],
+                        'cena' => [$horario->dinner_start, $horario->dinner_end],
+                    ]
                 ]);
             }
-
-            // Verificar si la hora está dentro del horario de almuerzo
-            $dentroAlmuerzo = false;
-            if ($horario->lunch_start && $horario->lunch_end) {
-                $dentroAlmuerzo = $hora >= $horario->lunch_start && $hora <= $horario->lunch_end;
-            }
-
-            // Verificar si la hora está dentro del horario de cena
-            $dentroCena = false;
-            if ($horario->dinner_start && $horario->dinner_end) {
-                $dentroCena = $hora >= $horario->dinner_start && $hora <= $horario->dinner_end;
-            }
-
-            $dentroHorario = $dentroAlmuerzo || $dentroCena;
+    
+            // Convertimos todo a Carbon y normalizamos fecha a evitar problemas
+            $hora = \Carbon\Carbon::createFromFormat('H:i', $validated['hora'])->setDate(2000, 1, 1);
+            $lunchStart = $horario->lunch_start ? \Carbon\Carbon::parse($horario->lunch_start)->setDate(2000, 1, 1) : null;
+            $lunchEnd = $horario->lunch_end ? \Carbon\Carbon::parse($horario->lunch_end)->setDate(2000, 1, 1) : null;
+            $dinnerStart = $horario->dinner_start ? \Carbon\Carbon::parse($horario->dinner_start)->setDate(2000, 1, 1) : null;
+            $dinnerEnd = $horario->dinner_end ? \Carbon\Carbon::parse($horario->dinner_end)->setDate(2000, 1, 1) : null;
+    
+            $dentroAlmuerzo = $lunchStart && $lunchEnd && $hora->between($lunchStart, $lunchEnd);
+            $dentroCena = $dinnerStart && $dinnerEnd && $hora->between($dinnerStart, $dinnerEnd);
+    
+            $dentro = $dentroAlmuerzo || $dentroCena;
             $turno = $dentroAlmuerzo ? 'almuerzo' : ($dentroCena ? 'cena' : null);
-
+    
             return response()->json([
-                'dentro_horario' => $dentroHorario,
+                'dentro_horario' => $dentro,
                 'turno' => $turno,
-                'mensaje' => $dentroHorario 
-                    ? "El horario está dentro del turno de {$turno}" 
+                'mensaje' => $dentro
+                    ? "El horario está dentro del turno de {$turno}"
                     : "El horario está fuera del horario de servicio"
             ]);
         } catch (\Exception $e) {
-            $this->logError('Error al verificar horario de servicio', $e);
-            return response()->json(['message' => 'Error al verificar el horario de servicio: ' . $e->getMessage()], 500);
+            return response()->json(['message' => 'Error al verificar horario: ' . $e->getMessage()], 500);
         }
     }
+    
+
+
+    
 } 
