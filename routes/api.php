@@ -46,8 +46,21 @@ Route::get('reservas/verificar-disponibilidad', [ReservaController::class, 'veri
     Route::apiResource('combinaciones-mesas', CombinacionMesaController::class);
     
     // Rutas para Horarios de Mesas
-    Route::apiResource('horarios-mesas', HorarioMesaController::class);
-    
+    //Con ApiResource no funciona
+    Route::get('/horarios-mesas/mesa/{mesa}', [HorarioMesaController::class, 'porMesa']);
+    //Ruta para obtener todos los horarios de mesas
+    Route::get('/horarios-mesas', [HorarioMesaController::class, 'index']);
+    //Ruta para crear un horario de mesa
+    Route::post('/horarios-mesas', [HorarioMesaController::class, 'store']);
+    //Ruta para actualizar un horario de mesa
+    Route::put('/horarios-mesas/{horario}', [HorarioMesaController::class, 'update']);
+    //Ruta para eliminar un horario de mesa
+    Route::delete('/horarios-mesas/{horario}', [HorarioMesaController::class, 'destroy']);
+    //Ruta para sincronizar horarios de mesas
+    Route::post('horarios/sync', [HorarioMesaController::class, 'syncHorarios']);
+
+
+
     // Rutas para Horarios de Combinaciones
     Route::apiResource('horarios-combinaciones', HorarioCombinacionController::class);
     
