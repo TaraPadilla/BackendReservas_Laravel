@@ -86,7 +86,7 @@ class MesaController extends Controller
                 'sede_id' => 'required|exists:sedes,id',
                 'numero' => 'required|integer',
                 'capacidad_min' => 'required|integer|min:1',
-                'capacidad_max' => 'required|integer|gt:capacidad_min',
+                'capacidad_max' => 'required|integer|gte:capacidad_min',
                 'duracion_turno_minutos' => 'required|integer|min:30',
                 'ubicacion' => 'required|in:interior,exterior',
                 'forma' => 'required|in:rectangulo,cuadrado,circulo,ovalada',
@@ -100,9 +100,20 @@ class MesaController extends Controller
             $this->logInfo('Mesa creada exitosamente', ['mesa_id' => $mesa->id]);
 
             return response()->json($mesa->load(['sede', 'horarios']), 201);
-        } catch (\Exception $e) {
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ($e->errorInfo[1] == 1062) {
+                $this->logError('Intento de duplicado al crear mesa', $e);
+                return response()->json([
+                    'message' => 'Número de mesa ya creado previamente.'
+                ], 409); // 409 Conflict
+            }
+        
             $this->logError('Error al crear mesa', $e);
             return response()->json(['message' => 'Error al crear la mesa'], 500);
+        
+        } catch (\Exception $e) {
+            $this->logError('Error inesperado al crear mesa', $e);
+            return response()->json(['message' => 'Error inesperado al crear la mesa'], 500);
         }
     }
 
@@ -129,7 +140,7 @@ class MesaController extends Controller
                 'sede_id' => 'exists:sedes,id',
                 'numero' => 'integer',
                 'capacidad_min' => 'integer|min:1',
-                'capacidad_max' => 'integer|gt:capacidad_min',
+                'capacidad_max' => 'integer|gte:capacidad_min',
                 'duracion_turno_minutos' => 'integer|min:30',
                 'ubicacion' => 'in:interior,exterior',
                 'forma' => 'in:rectangulo,cuadrado,circulo,ovalada',
@@ -144,9 +155,20 @@ class MesaController extends Controller
             $this->logInfo('Mesa actualizada exitosamente', ['mesa_id' => $mesa->id]);
 
             return response()->json($mesa->load(['sede', 'horarios']));
-        } catch (\Exception $e) {
-            $this->logError('Error al actualizar mesa', $e);
+        } catch (\Illuminate\Database\QueryException $e) {
+            if ($e->errorInfo[1] == 1062) {
+                $this->logError('Intento de duplicado al actualizar mesa', $e);
+                return response()->json([
+                    'message' => 'Número de mesa ya creado previamente.'
+                ], 409);
+            }
+    
+            $this->logError('Error al actualizar mesa (query)', $e);
             return response()->json(['message' => 'Error al actualizar la mesa'], 500);
+    
+        } catch (\Exception $e) {
+            $this->logError('Error inesperado al actualizar mesa', $e);
+            return response()->json(['message' => 'Error inesperado al actualizar la mesa'], 500);
         }
     }
 
