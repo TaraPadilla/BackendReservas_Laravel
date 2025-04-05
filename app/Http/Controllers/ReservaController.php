@@ -132,8 +132,14 @@ class ReservaController extends Controller
                 return response()->json(['message' => 'No hay mesas disponibles para los criterios especificados'], 422);
             }
 
+            $this->logInfo('Mesas disponibles encontradas', ['mesas' => $mesasDisponibles]);
+            // Obtener el id de la mesa
+            $mesaId = $mesasDisponibles->first()->id;
+            $this->logInfo('Mesa disponible encontrada', ['mesa_id' => $mesaId]);
+
             // Crear la reserva
             $reserva = Reserva::create([
+                'mesa_id' => $mesaId,
                 'fecha' => $validated['fecha'],
                 'hora_inicio' => $validated['hora_inicio'],
                 'hora_fin' => $horaFin,
@@ -207,7 +213,7 @@ class ReservaController extends Controller
     public function destroy(Reserva $reserva)
     {
         try {
-            $this->logInfo('Iniciando eliminación de reserva', ['reserva_id' => $reserva->id]);
+            $this->logInfo('Iniciando cancelación de reserva', ['reserva_id' => $reserva->id]);
 
             // Liberar la mesa antes de eliminar la reserva
             if ($reserva->mesa) {
@@ -238,6 +244,16 @@ class ReservaController extends Controller
     public function cancelar(Reserva $reserva)
     {
         $reserva->update(['estado' => 'cancelada']);
+        return response()->json($reserva);  
+    }
+
+    //Cancelar reserva con el id de la reserva
+    public function cancelarReserva($id)
+    {
+        $reserva = Reserva::findOrFail($id);
+        $reserva->update(['estado' => 'cancelada']);
+        $reserva->deleted_at = now();
+        $reserva->save();
         return response()->json($reserva);
     }
 
