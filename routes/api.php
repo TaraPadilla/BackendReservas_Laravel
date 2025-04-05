@@ -10,6 +10,8 @@ use App\Http\Controllers\CombinacionMesaController;
 use App\Http\Controllers\HorarioMesaController;
 use App\Http\Controllers\HorarioCombinacionController;
 use App\Http\Controllers\ClienteController;
+use App\Http\Controllers\BloqueoMesaController;
+use App\Http\Controllers\HorarioSemanalController;
 
 /*
 |--------------------------------------------------------------------------
@@ -40,9 +42,7 @@ Route::get('reservas/verificar-disponibilidad', [ReservaController::class, 'veri
     Route::apiResource('mesas', MesaController::class);
     Route::get('/sedes/{sede}/disponibilidad', [MesaController::class, 'obtenerSimulacionDisponibilidad']);
     Route::get('/mesas/sede/{sede}', [MesaController::class, 'porSede']);
-    //Ruta para actualizar una mesa
     Route::put('/mesas/{mesa}', [MesaController::class, 'update']);
-    // Rutas para Combinaciones de Mesas
     Route::apiResource('combinaciones-mesas', CombinacionMesaController::class);
     
     // Rutas para Horarios de Mesas
@@ -67,11 +67,20 @@ Route::get('reservas/verificar-disponibilidad', [ReservaController::class, 'veri
     // Rutas para Reservas
     Route::apiResource('reservas', ReservaController::class);
     Route::post('reservas/{reserva}/confirmar', [ReservaController::class, 'confirmar']);
-    Route::post('reservas/{reserva}/cancelar', [ReservaController::class, 'cancelar']);
+    Route::post('reservas/{id}', [ReservaController::class, 'cancelarReserva']);
     Route::get('reservas/por-fecha/{fecha}', [ReservaController::class, 'porFecha']);
 
     // Rutas de Clientes
     Route::apiResource('clientes', ClienteController::class);
+
+    // Rutas para Bloqueos de Mesas
+    Route::apiResource('bloqueos-mesas', BloqueoMesaController::class);
+    Route::get('bloqueos-mesas/por-rango', [BloqueoMesaController::class, 'porRangoFechas']);
+
+    // Rutas para Horarios Semanales
+    Route::apiResource('horarios-semanales', HorarioSemanalController::class);
+    Route::post('horarios-semanales/inicializar', [HorarioSemanalController::class, 'initialize']);
+    Route::post('horarios-semanales/verificar-servicio', [HorarioSemanalController::class, 'verificarHorarioServicio']);
 
     // Rutas del Motor de Asignación
     Route::prefix('motor')->group(function () {
@@ -80,4 +89,5 @@ Route::get('reservas/verificar-disponibilidad', [ReservaController::class, 'veri
         Route::get('horarios-servicio/{mesa}', [ReservaController::class, 'obtenerHorariosServicio']);
         Route::get('tipo-turno/{fecha}/{hora}', [ReservaController::class, 'determinarTipoTurno']);
     });
+    
 //}); 
