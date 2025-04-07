@@ -74,10 +74,11 @@ Route::get('reservas/verificar-disponibilidad', [ReservaController::class, 'veri
     Route::apiResource('clientes', ClienteController::class);
 
     // Rutas para Bloqueos de Mesas
-    Route::apiResource('bloqueos-mesas', BloqueoMesaController::class);
+    Route::get('bloqueos-mesas/{sede_id}', [BloqueoMesaController::class, 'index']);
+    Route::apiResource('bloqueos-mesas', BloqueoMesaController::class)->except(['index']);
     Route::get('bloqueos-mesas/por-rango', [BloqueoMesaController::class, 'porRangoFechas']);
 
-    // Rutas para Horarios Semanales
+    //Rutas para Horarios Semanales
     Route::get('horarios-semanales/{sede_id?}', [HorarioSemanalController::class, 'index']);
     Route::apiResource('horarios-semanales', HorarioSemanalController::class)->except(['index']);
     Route::put('horarios-semanales/{id}', [HorarioSemanalController::class, 'update']);

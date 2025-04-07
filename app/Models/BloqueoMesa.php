@@ -14,6 +14,7 @@ class BloqueoMesa extends Model
     protected $table = 'bloqueos_mesas';
 
     protected $fillable = [
+        'sede_id',
         'start_date',
         'end_date',
         'is_full_day',
@@ -40,6 +41,14 @@ class BloqueoMesa extends Model
         'is_full_day' => true,
         'affected_tables' => 'all'
     ];
+
+    /**
+     * Relación con la sede a la que pertenece el bloqueo
+     */
+    public function sede()
+    {
+        return $this->belongsTo(Sede::class);
+    }
 
     /**
      * Relación opcional con mesas específicas

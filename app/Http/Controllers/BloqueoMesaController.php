@@ -17,22 +17,24 @@ class BloqueoMesaController extends Controller
     /**
      * Obtiene todos los bloqueos de mesas
      */
-    public function index()
+    public function index($sedeId = null)
     {
         try {
-            $this->logInfo('Obteniendo lista de bloqueos de mesas');
-            
-            $bloqueos = BloqueoMesa::all()->map(function ($bloqueo) {
+            $this->logInfo('Obteniendo bloqueos de la sede', ['sede_id' => $sedeId]);
+
+            $bloqueos = BloqueoMesa::where('sede_id', $sedeId)
+                //->with('sede')
+                ->get()->map(function ($bloqueo) {
                 if ($bloqueo->affected_tables === 'specific') {
                     $bloqueo->load('mesas');
                 }
                 return $bloqueo;
             });
-    
+
             $this->logInfo('Lista de bloqueos obtenida', ['total' => $bloqueos->count()]);
             return response()->json($bloqueos);
         } catch (\Exception $e) {
-            $this->logError('Error al obtener lista de bloqueos', $e);
+            $this->logError('Error al obtener bloqueos', $e);
             return response()->json(['message' => 'Error al obtener los bloqueos'], 500);
         }
     }
@@ -44,9 +46,10 @@ class BloqueoMesaController extends Controller
     public function store(Request $request)
     {
         try {
-            $this->logInfo('Creando nuevo bloqueo de mesa', $request->all());
-    
+            $this->logInfo('Creando nuevo bloqueo', $request->all());
+
             $validated = $request->validate([
+                'sede_id' => 'required|exists:sedes,id',
                 'start_date' => 'required|date',
                 'end_date' => 'required|date|after_or_equal:start_date',
                 'is_full_day' => 'required|boolean',
@@ -67,12 +70,13 @@ class BloqueoMesaController extends Controller
                     )
                 ],
             ]);
-    
+
             $this->verificarSolapamiento($validated);
-    
+
             DB::beginTransaction();
-    
+
             $bloqueo = BloqueoMesa::create([
+                'sede_id' => $validated['sede_id'],
                 'start_date' => $validated['start_date'],
                 'end_date' => $validated['end_date'],
                 'is_full_day' => $validated['is_full_day'],
@@ -84,11 +88,10 @@ class BloqueoMesaController extends Controller
                     ? $validated['specific_tables']
                     : null,
             ]);
-    
+
             DB::commit();
-    
+
             $this->logInfo('Bloqueo creado exitosamente', ['id' => $bloqueo->id]);
-    
             return response()->json($bloqueo, 201);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -96,9 +99,6 @@ class BloqueoMesaController extends Controller
             return response()->json(['message' => 'Error al crear el bloqueo: ' . $e->getMessage()], 500);
         }
     }
-    
-
-
     /**
      * Muestra un bloqueo específico
      */
@@ -106,16 +106,19 @@ class BloqueoMesaController extends Controller
     {
         try {
             $this->logInfo('Obteniendo detalles de bloqueo', ['id' => $bloqueoMesa->id]);
+
+            $bloqueoMesa->load('sede');
+
             if ($bloqueoMesa->affected_tables === 'specific') {
                 $bloqueoMesa->load('mesas');
             }
+
             return response()->json($bloqueoMesa);
         } catch (\Exception $e) {
             $this->logError('Error al obtener detalles de bloqueo', $e);
             return response()->json(['message' => 'Error al obtener los detalles del bloqueo'], 500);
         }
-    }    
-
+    }  
     /**
      * Actualiza un bloqueo existente
      */
@@ -123,8 +126,9 @@ class BloqueoMesaController extends Controller
     {
         try {
             $this->logInfo('Actualizando bloqueo', ['id' => $bloqueoMesa->id, 'data' => $request->all()]);
-    
+
             $validated = $request->validate([
+                'sede_id' => 'required|exists:sedes,id',
                 'start_date' => 'required|date',
                 'end_date' => 'required|date|after_or_equal:start_date',
                 'is_full_day' => 'required|boolean',
@@ -145,13 +149,13 @@ class BloqueoMesaController extends Controller
                     )
                 ],
             ]);
-    
-            // Verificar que las fechas no se solapan con otros bloqueos (excluyendo el actual)
+
             $this->verificarSolapamiento($validated, $bloqueoMesa->id);
-    
+
             DB::beginTransaction();
-    
+
             $bloqueoMesa->update([
+                'sede_id' => $validated['sede_id'],
                 'start_date' => $validated['start_date'],
                 'end_date' => $validated['end_date'],
                 'is_full_day' => $validated['is_full_day'],
@@ -163,11 +167,10 @@ class BloqueoMesaController extends Controller
                     ? $validated['specific_tables']
                     : null,
             ]);
-    
+
             DB::commit();
-    
+
             $this->logInfo('Bloqueo actualizado exitosamente', ['id' => $bloqueoMesa->id]);
-    
             return response()->json($bloqueoMesa);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -175,8 +178,6 @@ class BloqueoMesaController extends Controller
             return response()->json(['message' => 'Error al actualizar el bloqueo: ' . $e->getMessage()], 500);
         }
     }
-    
-
     /**
      * Elimina un bloqueo
      */
