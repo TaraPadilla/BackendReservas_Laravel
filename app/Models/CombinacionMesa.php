@@ -2,46 +2,49 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class CombinacionMesa extends Model
 {
     use HasFactory, SoftDeletes;
 
     protected $table = 'combinaciones_mesas';
+
     protected $fillable = [
         'sede_id',
+        'mesa_id',
+        'mesas_combinadas_ids',
         'capacidad_min',
         'capacidad_max',
         'duracion_turno_minutos',
-        'mesas_ids',
         'es_excepcional',
         'activa'
     ];
 
     protected $casts = [
-        'id' => 'integer',
-        'sede_id' => 'integer',
-        'capacidad_min' => 'integer',
-        'capacidad_max' => 'integer',
-        'duracion_turno_minutos' => 'integer',
-        'mesas_ids' => 'array',
+        'mesas_combinadas_ids' => 'array',
         'es_excepcional' => 'boolean',
         'activa' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
-        'deleted_at' => 'datetime'
+        'deleted_at' => 'datetime',
     ];
 
+    /**
+     * Relación con la sede
+     */
     public function sede()
     {
-        return $this->belongsTo(Sede::class, 'sede_id');
+        return $this->belongsTo(Sede::class);
     }
 
-    public function reservas()
+    /**
+     * Relación con la mesa principal
+     */
+    public function mesaPrincipal()
     {
-        return $this->hasMany(Reserva::class, 'combinacion_mesa_id');
+        return $this->belongsTo(Mesa::class, 'mesa_id');
     }
-} 
+}

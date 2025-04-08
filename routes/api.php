@@ -43,7 +43,6 @@ Route::get('reservas/verificar-disponibilidad', [ReservaController::class, 'veri
     Route::get('/sedes/{sede}/disponibilidad', [MesaController::class, 'obtenerSimulacionDisponibilidad']);
     Route::get('/mesas/sede/{sede}', [MesaController::class, 'porSede']);
     Route::put('/mesas/{mesa}', [MesaController::class, 'update']);
-    Route::apiResource('combinaciones-mesas', CombinacionMesaController::class);
     
     // Rutas para Horarios de Mesas
     //Con ApiResource no funciona
@@ -85,6 +84,11 @@ Route::get('reservas/verificar-disponibilidad', [ReservaController::class, 'veri
     Route::post('horarios-semanales/inicializar/{sede_id}', [HorarioSemanalController::class, 'initialize']);
     Route::post('horarios-semanales/verificar-servicio', [HorarioSemanalController::class, 'verificarHorarioServicio']);
     
+
+    // Rutas para Combinaciones de Mesas
+    Route::get('combinaciones-mesas/{sede_id?}', [CombinacionMesaController::class, 'index']);
+    Route::apiResource('combinaciones-mesas', CombinacionMesaController::class)->except(['index']);
+
     // Rutas del Motor de Asignación
     Route::prefix('motor')->group(function () {
         Route::post('buscar-mesas', [ReservaController::class, 'buscarMesasDisponibles']);
