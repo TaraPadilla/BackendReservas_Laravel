@@ -12,7 +12,7 @@ use App\Traits\LogTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
-
+use App\Models\CombinacionMesa;
 class MesaController extends Controller
 {
     use LogTrait;
@@ -251,20 +251,20 @@ class MesaController extends Controller
         try {
             $fecha = $request->input('fecha');
             $turno = $request->input('turno');
-
+    
             if (!$fecha || !$turno) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Debe proporcionar fecha y turno.'
                 ], 400);
             }
-
+    
             $this->logInfo('Simulación de disponibilidad iniciada', [
                 'sede_id' => $sedeId,
                 'fecha' => $fecha,
                 'tipo_turno' => $turno
             ]);
-
+    
             // Obtener mesas activas con horarios del turno
             $mesas = Mesa::where('sede_id', $sedeId)
                 ->where('activa', true)
@@ -272,13 +272,85 @@ class MesaController extends Controller
                     $query->where('tipo_turno', $turno);
                 }])
                 ->get();
-
-            // Obtener reservas activas para esas mesas en la fecha y turno
-            $reservas = Reserva::whereIn('mesa_id', $mesas->pluck('id'))
-            ->whereDate('fecha', $fecha)
-            ->where('estado', 'confirmada')
+    
+            // Obtener combinaciones activas con horarios de la mesa principal
+            $combinaciones = CombinacionMesa::with([
+                'mesaPrincipal.horarios' => function ($query) use ($turno) {
+                    $query->where('tipo_turno', $turno);
+                }
+            ])
+            ->where('sede_id', $sedeId)
+            ->where('activa', true)
             ->get();
-        
+    
+            // Obtener reservas directas
+            $reservas = Reserva::whereIn('mesa_id', $mesas->pluck('id'))
+                ->whereDate('fecha', $fecha)
+                ->where('estado', 'confirmada')
+                ->get();
+    
+            // Agrupar horarios ocupados por mesa directa
+            $horariosOcupadosUnificados = $reservas
+                ->groupBy('mesa_id')
+                ->map(fn($res) => $res->pluck('hora_inicio')->toArray())
+                ->toArray();
+    
+            // Obtener reservas por combinaciones
+            $reservasCombinadas = Reserva::whereNotNull('combinacion_mesa_id')
+                ->whereDate('fecha', $fecha)
+                ->where('estado', 'confirmada')
+                ->with('combinacionMesa')
+                ->get();
+    
+            foreach ($reservasCombinadas as $reserva) {
+                $combinacion = $reserva->combinacionMesa;
+    
+                if (!$combinacion) continue;
+
+                $this->logInfo("💡 Procesando reserva combinada", [
+                    'reserva_id' => $reserva->id,
+                    'combinacion_id' => $combinacion->id ?? null,
+                    'mesas_combinadas' => $combinacion->mesas_combinadas_ids ?? [],
+                ]);
+    
+                // Mesa principal
+                $horariosOcupadosUnificados[$combinacion->mesa_id][] = $reserva->hora_inicio;
+    
+                // Mesas combinadas
+                foreach ($combinacion->obtenerMesasCombinadas() as $mesa) {
+                    $horariosOcupadosUnificados[$mesa->id][] = $reserva->hora_inicio;
+                }
+    
+                // ID de la combinación (usado en el frontend)
+                $horariosOcupadosUnificados[$combinacion->id][] = $reserva->hora_inicio;
+            }
+    
+            // Eliminar duplicados
+            foreach ($horariosOcupadosUnificados as $id => $horas) {
+                $horariosOcupadosUnificados[$id] = array_values(array_unique($horas));
+            }
+
+            // Marcar como ocupados en la combinación todos los horarios ocupados de sus mesas
+            foreach ($combinaciones as $combinacion) {
+                $mesaPrincipalId = $combinacion->mesa_id;
+                $mesasInvolucradas = array_merge([$mesaPrincipalId], $combinacion->mesas_combinadas_ids ?? []);
+
+                $horariosOcupados = [];
+
+                foreach ($mesasInvolucradas as $mesaId) {
+                    if (!empty($horariosOcupadosUnificados[$mesaId])) {
+                        $horariosOcupados = array_merge($horariosOcupados, $horariosOcupadosUnificados[$mesaId]);
+                    }
+                }
+
+                if (!empty($horariosOcupados)) {
+                    $horariosOcupadosUnificados[$combinacion->id] = array_values(array_unique(
+                        array_merge($horariosOcupadosUnificados[$combinacion->id] ?? [], $horariosOcupados)
+                    ));
+                }
+            }
+
+    
             // Formatear mesas
             $mesasFormateadas = $mesas->map(function ($mesa) {
                 return [
@@ -287,26 +359,38 @@ class MesaController extends Controller
                     'capacidad_min' => $mesa->capacidad_min,
                     'capacidad_max' => $mesa->capacidad_max,
                     'combinable' => $mesa->combinable,
+                    'es_combinacion' => false,
                     'horarios' => $mesa->horarios->pluck('hora')->toArray()
                 ];
             });
-
-            // Agrupar horarios ocupados por mesa
-            $horariosOcupados = $reservas->groupBy('mesa_id')->map(function ($reservasMesa) {
-                return $reservasMesa->pluck('hora_inicio')->toArray();
+    
+            // Formatear combinaciones
+            $combinacionesFormateadas = $combinaciones->map(function ($combinacion) {
+                return [
+                    'id' => $combinacion->id,
+                    'numero' => $combinacion->id,
+                    'capacidad_min' => $combinacion->capacidad_min,
+                    'capacidad_max' => $combinacion->capacidad_max,
+                    'combinable' => false,
+                    'es_combinacion' => true,
+                    'horarios' => $combinacion->mesaPrincipal->horarios->pluck('hora')->toArray()
+                ];
             });
-
+    
+            // Unir mesas + combinaciones
+            $mesasYCombinaciones = $mesasFormateadas->merge($combinacionesFormateadas)->values();
+    
             return response()->json([
                 'status' => 'success',
                 'data' => [
-                    'mesas' => $mesasFormateadas,
-                    'horarios_ocupados' => $horariosOcupados
+                    'mesas' => $mesasYCombinaciones,
+                    'horarios_ocupados' => $horariosOcupadosUnificados
                 ]
             ]);
-
+    
         } catch (\Exception $e) {
             $this->logError('Error en simulación de disponibilidad', $e);
-
+    
             return response()->json([
                 'status' => 'error',
                 'message' => 'Ocurrió un error al obtener la disponibilidad.',
@@ -314,6 +398,4 @@ class MesaController extends Controller
             ], 500);
         }
     }
-
-
 } 

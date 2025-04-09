@@ -67,4 +67,11 @@ class Mesa extends Model
     {
         return $this->belongsToMany(CombinacionMesa::class, 'combinacion_mesa_mesa', 'mesa_id', 'combinacion_mesa_id');
     }
+
+    public function reservasCombinadas()
+    {
+        return $this->hasMany(Reserva::class, 'mesa_id')->whereNotNull('combinacion_mesa_id');
+    }
+    
+
 } 

@@ -104,7 +104,6 @@ class ReservaController extends Controller
                 'notas' => 'nullable|string'
             ]);
 
-            // Calcular hora fin basada en la duración del turno
             $mesa = Mesa::where('sede_id', $validated['sede_id'])
                 ->where('activa', true)
                 ->where('estado', 'disponible')
@@ -114,43 +113,79 @@ class ReservaController extends Controller
                 return response()->json(['message' => 'No hay mesas disponibles en esta sede'], 422);
             }
 
-            $horaFin = Carbon::parse($validated['hora_inicio'])
-                ->addMinutes($mesa->duracion_turno_minutos)
-                ->format('H:i');
-
-            // Buscar mesas disponibles
+            // Buscar mesas individuales
             $mesasDisponibles = $this->mesaAssignmentService->encontrarMesasDisponibles(
                 $validated['fecha'],
                 $validated['hora_inicio'],
-                $horaFin,
                 $validated['num_personas'],
                 $validated['sede_id'],
                 $validated['ubicacion'] ?? null
             );
+
+            // Si no hay individuales, buscar combinaciones
+            if ($mesasDisponibles->isEmpty()) {
+                $this->logWarning('No se encontraron mesas individuales, buscando combinaciones');
+
+                $mesasDisponibles = $this->mesaAssignmentService->buscarCombinacionesDisponibles(
+                    $validated['fecha'],
+                    $validated['hora_inicio'],
+                    $validated['num_personas'],
+                    $validated['sede_id'],
+                    $validated['ubicacion'] ?? null
+                );
+            }
 
             if ($mesasDisponibles->isEmpty()) {
                 return response()->json(['message' => 'No hay mesas disponibles para los criterios especificados'], 422);
             }
 
             $this->logInfo('Mesas disponibles encontradas', ['mesas' => $mesasDisponibles]);
-            // Obtener el id de la mesa
-            $mesaId = $mesasDisponibles->first()->id;
-            $this->logInfo('Mesa disponible encontrada', ['mesa_id' => $mesaId]);
+            $mesaSeleccionada = $mesasDisponibles->first();
 
-            // Crear la reserva
-            $reserva = Reserva::create([
-                'mesa_id' => $mesaId,
-                'fecha' => $validated['fecha'],
-                'hora_inicio' => $validated['hora_inicio'],
-                'hora_fin' => $horaFin,
-                'num_personas' => $validated['num_personas'],
-                'cliente_id' => $validated['cliente_id'],
-                'notas' => $validated['notas'] ?? null,
-                'estado' => 'confirmada'
-            ]);
+            if ($mesaSeleccionada instanceof \App\Models\CombinacionMesa) {
+                $this->logInfo('Creando reserva con combinación', [
+                    'combinacion_id' => $mesaSeleccionada->id,
+                    'mesa_principal' => $mesaSeleccionada->mesa_id
+                ]);
 
-            // Asignar la primera mesa disponible
-            $this->mesaAssignmentService->asignarMesa($reserva, $mesasDisponibles->first());
+                //Calcula la hora fin de la combinación
+                $horaFin = Carbon::parse($validated['hora_inicio'])
+                    ->addMinutes($mesaSeleccionada->duracion_turno_minutos)
+                    ->format('H:i');
+
+                $reserva = Reserva::create([
+                    'mesa_id' => $mesaSeleccionada->mesa_id, // <- esta es la mesa real
+                    'combinacion_mesa_id' => $mesaSeleccionada->id,
+                    'fecha' => $validated['fecha'],
+                    'hora_inicio' => $validated['hora_inicio'],
+                    'hora_fin' => $horaFin,
+                    'num_personas' => $validated['num_personas'],
+                    'cliente_id' => $validated['cliente_id'],
+                    'notas' => $validated['notas'] ?? null,
+                    'estado' => 'confirmada'
+                ]);
+
+                $this->mesaAssignmentService->asignarMesa($reserva, $mesaSeleccionada);
+            } else {
+                //calcula la hora fin
+                $horaFin = Carbon::parse($validated['hora_inicio'])
+                    ->addMinutes($mesaSeleccionada->duracion_turno_minutos)
+                    ->format('H:i');
+
+                $reserva = Reserva::create([
+                    'mesa_id' => $mesaSeleccionada->id,
+                    'fecha' => $validated['fecha'],
+                    'hora_inicio' => $validated['hora_inicio'],
+                    'hora_fin' => $horaFin,
+                    'num_personas' => $validated['num_personas'],
+                    'cliente_id' => $validated['cliente_id'],
+                    'notas' => $validated['notas'] ?? null,
+                    'estado' => 'confirmada'
+                ]);
+
+                $this->mesaAssignmentService->asignarMesa($reserva, $mesaSeleccionada);
+            }
+
 
             $this->logInfo('Reserva creada exitosamente', ['reserva_id' => $reserva->id]);
 
@@ -160,6 +195,7 @@ class ReservaController extends Controller
             return response()->json(['message' => 'Error al crear la reserva'], 500);
         }
     }
+
 
     public function show(Reserva $reserva)
     {
@@ -255,80 +291,6 @@ class ReservaController extends Controller
         $reserva->deleted_at = now();
         $reserva->save();
         return response()->json($reserva);
-    }
-
-    /**
-     * Busca mesas disponibles según los criterios especificados
-     */
-    public function buscarMesasDisponibles(Request $request)
-    {
-        try {
-            $this->logInfo('Iniciando búsqueda de mesas disponibles', $request->all());
-
-            $validated = $request->validate([
-                'fecha' => 'required|date',
-                'hora_inicio' => 'required|date_format:H:i',
-                'hora_fin' => 'required|date_format:H:i|after:hora_inicio',
-                'num_personas' => 'required|integer|min:1',
-                'sede_id' => 'required|exists:sedes,id'
-            ]);
-
-            $mesasDisponibles = $this->mesaAssignmentService->encontrarMesasDisponibles(
-                $validated['fecha'],
-                $validated['hora_inicio'],
-                $validated['hora_fin'],
-                $validated['num_personas'],
-                $validated['sede_id']
-            );
-
-            $this->logInfo('Búsqueda de mesas completada', [
-                'mesas_encontradas' => $mesasDisponibles->count()
-            ]);
-
-            return response()->json([
-                'mesas_disponibles' => $mesasDisponibles
-            ]);
-        } catch (\Exception $e) {
-            $this->logError('Error al buscar mesas disponibles', $e);
-            return response()->json(['message' => 'Error al buscar mesas disponibles'], 500);
-        }
-    }
-
-    /**
-     * Verifica si una combinación de mesas está disponible
-     */
-    public function verificarCombinacion(Request $request)
-    {
-        try {
-            $this->logInfo('Iniciando verificación de combinación', $request->all());
-
-            $validated = $request->validate([
-                'combinacion_id' => 'required|exists:combinaciones_mesas,id',
-                'fecha' => 'required|date',
-                'hora_inicio' => 'required|date_format:H:i',
-                'hora_fin' => 'required|date_format:H:i|after:hora_inicio'
-            ]);
-
-            $combinacion = CombinacionMesa::findOrFail($validated['combinacion_id']);
-            $disponible = $this->mesaAssignmentService->verificarDisponibilidad(
-                $combinacion,
-                $validated['fecha'],
-                $validated['hora_inicio'],
-                $validated['hora_fin']
-            );
-
-            $this->logInfo('Verificación de combinación completada', [
-                'combinacion_id' => $combinacion->id,
-                'disponible' => $disponible
-            ]);
-
-            return response()->json([
-                'disponible' => $disponible
-            ]);
-        } catch (\Exception $e) {
-            $this->logError('Error al verificar combinación', $e);
-            return response()->json(['message' => 'Error al verificar la combinación'], 500);
-        }
     }
 
     /**

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Collection;
 
 class CombinacionMesa extends Model
 {
@@ -47,4 +48,12 @@ class CombinacionMesa extends Model
     {
         return $this->belongsTo(Mesa::class, 'mesa_id');
     }
+
+    public function obtenerMesasCombinadas(): Collection
+    {
+        $ids = array_merge([$this->mesa_id], $this->mesas_combinadas_ids ?? []);
+        return Mesa::whereIn('id', $ids)->get();
+    }
+
+    
 }
