@@ -7,6 +7,7 @@ use App\Models\Mesa;
 use App\Models\Cliente;
 use App\Models\CombinacionMesa;
 use App\Services\MesaAssignmentService;
+use App\Services\EmailService;
 use App\Traits\LogTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -17,10 +18,12 @@ class ReservaController extends Controller
     use LogTrait;
 
     protected $mesaAssignmentService;
+    protected $emailService;
 
-    public function __construct(MesaAssignmentService $mesaAssignmentService)
+    public function __construct(MesaAssignmentService $mesaAssignmentService, EmailService $emailService)
     {
         $this->mesaAssignmentService = $mesaAssignmentService;
+        $this->emailService = $emailService;
     }
 
     public function index()
@@ -189,6 +192,9 @@ class ReservaController extends Controller
 
             $this->logInfo('Reserva creada exitosamente', ['reserva_id' => $reserva->id]);
 
+            // Enviar correos de confirmación
+            $this->enviarCorreosConfirmacion($reserva);
+
             return response()->json($reserva->load(['mesa', 'cliente', 'combinacionMesa']), 201);
         } catch (\Exception $e) {
             $this->logError('Error al crear reserva', $e);
@@ -196,6 +202,31 @@ class ReservaController extends Controller
         }
     }
 
+    /**
+     * Envía los correos de confirmación al cliente y al administrador
+     *
+     * @param Reserva $reserva
+     * @return void
+     */
+    private function enviarCorreosConfirmacion(Reserva $reserva): void
+    {
+        try {
+            $this->logInfo('Iniciando envío de correos de confirmación', [
+                'reserva_id' => $reserva->id
+            ]);
+
+            // Enviar correo al cliente
+            $this->emailService->enviarCorreoConfirmacionCliente($reserva);
+
+            // Enviar correo al administrador
+            $this->emailService->enviarCorreoNotificacionAdmin($reserva);
+
+            $this->logInfo('Correos de confirmación enviados exitosamente');
+        } catch (\Exception $e) {
+            $this->logError('Error al enviar correos de confirmación', $e);
+            // No lanzamos la excepción para no interrumpir el flujo principal
+        }
+    }
 
     public function show(Reserva $reserva)
     {
@@ -350,6 +381,50 @@ class ReservaController extends Controller
         } catch (\Exception $e) {
             $this->logError('Error al determinar tipo de turno', $e);
             return response()->json(['message' => 'Error al determinar el tipo de turno'], 500);
+        }
+    }
+
+    /**
+     * Cancela una reserva mediante el enlace enviado por correo
+     *
+     * @param int $id
+     * @return \Illuminate\Http\Response
+     */
+    public function cancelarReservaPorEnlace($id)
+    {
+        try {
+            $this->logInfo('Iniciando cancelación de reserva por enlace', ['reserva_id' => $id]);
+
+            $reserva = Reserva::findOrFail($id);
+            
+            // Verificar que la reserva no esté ya cancelada
+            if ($reserva->estado === 'cancelada') {
+                $this->logWarning('La reserva ya está cancelada', ['reserva_id' => $id]);
+                return view('reservas.cancelacion', [
+                    'estado' => 'ya_cancelada',
+                    'reserva' => $reserva
+                ]);
+            }
+
+            // Actualizar el estado de la reserva
+            $reserva->estado = 'cancelada';
+            $reserva->save();
+
+            $this->logInfo('Reserva cancelada exitosamente', ['reserva_id' => $id]);
+
+            // Enviar correo de confirmación de cancelación
+            $this->emailService->enviarCorreoCancelacionCliente($reserva);
+
+            return view('reservas.cancelacion', [
+                'estado' => 'cancelada',
+                'reserva' => $reserva
+            ]);
+        } catch (\Exception $e) {
+            $this->logError('Error al cancelar reserva por enlace', $e);
+            return view('reservas.cancelacion', [
+                'estado' => 'error',
+                'mensaje' => 'Ha ocurrido un error al cancelar la reserva. Por favor, contacta con el restaurante.'
+            ]);
         }
     }
 } 

@@ -12,7 +12,9 @@ use App\Http\Controllers\HorarioCombinacionController;
 use App\Http\Controllers\ClienteController;
 use App\Http\Controllers\BloqueoMesaController;
 use App\Http\Controllers\HorarioSemanalController;
-
+use App\Services\EmailService;
+use App\Models\Reserva;
+use Illuminate\Support\Facades\Mail;
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -23,6 +25,29 @@ use App\Http\Controllers\HorarioSemanalController;
 Route::get('/test', function () {
     return response()->json(['message' => 'API funcionando correctamente']);
 });
+
+
+    Route::get('/test-email', function (EmailService $emailService) {
+    $reserva = Reserva::first(); // Asegúrate de tener alguna reserva en la base de datos
+
+    if (!$reserva) {
+        return 'No hay reservas en la base de datos.';
+    }
+
+    try {
+        $emailService->enviarCorreoConfirmacionCliente($reserva);
+        $emailService->enviarCorreoNotificacionAdmin($reserva);
+        return 'Correos enviados correctamente.';
+    } catch (\Throwable $e) {
+        return 'Error al enviar: ' . $e->getMessage();
+    }
+});
+
+
+
+// Ruta para cancelar reserva mediante enlace en correo
+Route::get('/reservas/cancelar/{id}', [ReservaController::class, 'cancelarReservaPorEnlace'])
+    ->name('reservas.cancelar');
 
 // Rutas públicas
 Route::get('restaurantes/activos', [RestauranteController::class, 'activos']);
