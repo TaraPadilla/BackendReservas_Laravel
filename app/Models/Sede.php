@@ -16,6 +16,12 @@ class Sede extends Model
         'nombre',
         'direccion',
         'ciudad',
+        'telefono',
+        'admin_nombre',
+        'admin_email',
+        'descripcion',
+        'image_card',
+        'image_banner',
         'activo'
     ];
 
