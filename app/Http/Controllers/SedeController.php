@@ -51,7 +51,6 @@ class SedeController extends Controller
 
             // Validar campos de texto
             $validated = $request->validate([
-                'restaurante_id' => 'required|exists:restaurantes,id',
                 'nombre' => 'required|string|max:100',
                 'direccion' => 'required|string',
                 'ciudad' => 'required|string|max:100',
@@ -62,6 +61,9 @@ class SedeController extends Controller
                 'activo' => 'boolean|in:0,1,true,false,"true","false"'
             ]);
 
+            // restaurante_id es 1 por defecto
+            $validated['restaurante_id'] = 1;
+            
             // Validar y guardar image_card si viene
             if ($request->hasFile('image_card')) {
                 $file = $request->file('image_card');
