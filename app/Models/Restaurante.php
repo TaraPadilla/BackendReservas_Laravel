@@ -12,9 +12,12 @@ class Restaurante extends Model
 
     protected $table = 'restaurantes';
     protected $fillable = [
-        'id',
         'nombre',
+        'nombre_admin',
+        'email_admin',
+        'descripcion_corta',
         'logo',
+        'imagen_banner',
         'activo'
     ];
 
