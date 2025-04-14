@@ -7,6 +7,7 @@ use App\Traits\LogTrait;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
+use Carbon\Carbon;
 
 class EmailService
 {
@@ -32,13 +33,14 @@ class EmailService
             $restaurante = $sede->restaurante;
 
             // Generar URL para cancelar la reserva
-            $cancelarUrl = URL::temporarySignedRoute(
+            $cancelarUrl = URL::signedRoute(
                 'reservas.cancelar',
-                $reserva->hora_inicio->subHours(2),
                 ['id' => $reserva->id]
             );
-            
 
+            //Consola
+            $this->logInfo('URL de cancelación generada', ['url' => $cancelarUrl]);
+            
             // Asegurarnos de que la URL sea absoluta y use el dominio correcto
             if (!Str::startsWith($cancelarUrl, ['http://', 'https://'])) {
                 $cancelarUrl = config('app.url') . $cancelarUrl;

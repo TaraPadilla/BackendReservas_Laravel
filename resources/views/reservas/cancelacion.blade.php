@@ -101,7 +101,7 @@
             <div class="status-icon success">✓</div>
             <h2 class="title">¡Reserva Cancelada!</h2>
             <p class="message">Tu reserva ha sido cancelada exitosamente.</p>
-            
+
             <div class="details">
                 <p><strong>Restaurante:</strong> {{ $reserva->mesa->sede->restaurante->nombre }}</p>
                 <p><strong>Sede:</strong> {{ $reserva->mesa->sede->nombre }}</p>
@@ -109,15 +109,15 @@
                 <p><strong>Hora:</strong> {{ $reserva->hora_inicio }} - {{ $reserva->hora_fin }}</p>
                 <p><strong>Número de personas:</strong> {{ $reserva->num_personas }}</p>
             </div>
-            
+
             <p>Se ha enviado un correo de confirmación a tu dirección de email.</p>
-            
             <a href="/" class="button">Volver al inicio</a>
+
         @elseif($estado === 'ya_cancelada')
             <div class="status-icon warning">!</div>
             <h2 class="title">Reserva Ya Cancelada</h2>
             <p class="message">Esta reserva ya había sido cancelada anteriormente.</p>
-            
+
             <div class="details">
                 <p><strong>Restaurante:</strong> {{ $reserva->mesa->sede->restaurante->nombre }}</p>
                 <p><strong>Sede:</strong> {{ $reserva->mesa->sede->nombre }}</p>
@@ -125,21 +125,34 @@
                 <p><strong>Hora:</strong> {{ $reserva->hora_inicio }} - {{ $reserva->hora_fin }}</p>
                 <p><strong>Número de personas:</strong> {{ $reserva->num_personas }}</p>
             </div>
-            
+
             <a href="/" class="button">Volver al inicio</a>
+
+        @elseif($estado === 'fuera_de_tiempo')
+            <div class="status-icon warning">⏱</div>
+            <h2 class="title">Cancelación No Permitida</h2>
+            <p class="message">La reserva solo podía cancelarse con al menos 2 horas de antelación.</p>
+
+            <div class="details">
+                <p><strong>Fecha:</strong> {{ \Carbon\Carbon::parse($reserva->fecha)->format('d/m/Y') }}</p>
+                <p><strong>Hora de inicio:</strong> {{ $reserva->hora_inicio }}</p>
+            </div>
+
+            <p>Si necesitas ayuda, por favor contacta directamente con el restaurante.</p>
+            <a href="/" class="button">Volver al inicio</a>
+
         @else
             <div class="status-icon error">✕</div>
             <h2 class="title">Error al Cancelar la Reserva</h2>
             <p class="message">{{ $mensaje ?? 'Ha ocurrido un error al procesar tu solicitud.' }}</p>
-            
+
             <p>Por favor, contacta con el restaurante para obtener ayuda.</p>
-            
             <a href="/" class="button">Volver al inicio</a>
         @endif
-        
+
         <div class="footer">
             <p>&copy; {{ date('Y') }} {{ isset($reserva) ? $reserva->mesa->sede->restaurante->nombre : 'Restaurante' }}. Todos los derechos reservados.</p>
         </div>
     </div>
 </body>
-</html> 
+</html>

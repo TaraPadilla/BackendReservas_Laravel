@@ -72,11 +72,6 @@
 <body>
     <div class="container">
         <div class="header">
-            @if($restaurante->logo)
-                <img src="{{ $restaurante->logo }}" alt="{{ $restaurante->nombre }}" class="logo">
-            @else
-                <h1>{{ $restaurante->nombre }}</h1>
-            @endif
             <h2>Confirmación de Reserva</h2>
         </div>
         
@@ -108,7 +103,7 @@
                 <a href="{{ $cancelarUrl }}" class="button">Cancelar mi reserva</a>
             </div>
             
-            <p>Este enlace para cancelar la reserva estará disponible durante las próximas 24 horas.</p>
+            <p>Este enlace para cancelar la reserva estará disponible hasta máximo 2 horas antes del inicio de la reserva.</p>
             
             <p>Si tienes alguna pregunta o necesitas hacer cambios en tu reserva, por favor contáctanos.</p>
             

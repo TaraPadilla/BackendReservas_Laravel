@@ -12,6 +12,8 @@ use App\Traits\LogTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\URL;
 
 class ReservaController extends Controller
 {
@@ -192,39 +194,28 @@ class ReservaController extends Controller
 
             $this->logInfo('Reserva creada exitosamente', ['reserva_id' => $reserva->id]);
 
-            // Enviar correos de confirmación
-            $this->enviarCorreosConfirmacion($reserva);
+            // Preparar respuesta
+            $response = response()->json(
+                $reserva->load(['mesa', 'cliente', 'combinacionMesa']),
+                201
+            );
 
-            return response()->json($reserva->load(['mesa', 'cliente', 'combinacionMesa']), 201);
+            // Enviar correos de confirmación de forma segura (no afecta al cliente si falla)
+            try {
+                \App\Jobs\EnviarCorreosReservaJob::dispatchSync($reserva);
+            } catch (\Throwable $e) {
+               //Captura con log normal
+               Log::error('Error en envío de correo post-reserva', [
+                'reserva_id' => $reserva->id,
+                'error' => $e->getMessage()
+                ]);
+            }
+
+            return $response;
+
         } catch (\Exception $e) {
             $this->logError('Error al crear reserva', $e);
             return response()->json(['message' => 'Error al crear la reserva'], 500);
-        }
-    }
-
-    /**
-     * Envía los correos de confirmación al cliente y al administrador
-     *
-     * @param Reserva $reserva
-     * @return void
-     */
-    private function enviarCorreosConfirmacion(Reserva $reserva): void
-    {
-        try {
-            $this->logInfo('Iniciando envío de correos de confirmación', [
-                'reserva_id' => $reserva->id
-            ]);
-
-            // Enviar correo al cliente
-            $this->emailService->enviarCorreoConfirmacionCliente($reserva);
-
-            // Enviar correo al administrador
-            $this->emailService->enviarCorreoNotificacionAdmin($reserva);
-
-            $this->logInfo('Correos de confirmación enviados exitosamente');
-        } catch (\Exception $e) {
-            $this->logError('Error al enviar correos de confirmación', $e);
-            // No lanzamos la excepción para no interrumpir el flujo principal
         }
     }
 
@@ -308,22 +299,31 @@ class ReservaController extends Controller
         return response()->json($reserva);
     }
 
-    public function cancelar(Reserva $reserva)
+    //Cancelar reserva con el id de la reserva del admin
+    public function cancelarPorAdmin($id)
     {
-        $reserva->update(['estado' => 'cancelada']);
-        return response()->json($reserva);  
-    }
-
-    //Cancelar reserva con el id de la reserva
-    public function cancelarReserva($id)
-    {
-        $reserva = Reserva::findOrFail($id);
-        $reserva->update(['estado' => 'cancelada']);
-        $reserva->deleted_at = now();
+        $reserva = Reserva::with(['mesa', 'cliente'])->findOrFail($id);
+    
+        if ($reserva->estado === 'cancelada') {
+            return response()->json([
+                'message' => 'La reserva ya fue cancelada previamente.',
+                'reserva' => $reserva
+            ], 200);
+        }
+    
+        // Marcar la reserva como cancelada
+        $reserva->estado = 'cancelada';
+        //$reserva->deleted_at = now();
         $reserva->save();
-        return response()->json($reserva);
-    }
-
+    
+        // (Opcional) Enviar correo de notificación
+        // $this->emailService->enviarCorreoCancelacionCliente($reserva);
+    
+        return response()->json([
+            'message' => 'Reserva cancelada exitosamente por el administrador.',
+            'reserva' => $reserva
+        ]);
+    } 
     /**
      * Obtiene los horarios de servicio para una mesa específica
      */
@@ -394,9 +394,9 @@ class ReservaController extends Controller
     {
         try {
             $this->logInfo('Iniciando cancelación de reserva por enlace', ['reserva_id' => $id]);
-
+    
             $reserva = Reserva::findOrFail($id);
-            
+    
             // Verificar que la reserva no esté ya cancelada
             if ($reserva->estado === 'cancelada') {
                 $this->logWarning('La reserva ya está cancelada', ['reserva_id' => $id]);
@@ -405,16 +405,34 @@ class ReservaController extends Controller
                     'reserva' => $reserva
                 ]);
             }
-
-            // Actualizar el estado de la reserva
+    
+            // Validar que se esté cancelando al menos 2 horas antes del inicio
+            $fecha = Carbon::parse($reserva->fecha)->toDateString(); // solo "2025-04-13"
+            $horaInicio = Carbon::parse("$fecha {$reserva->hora_inicio}");
+            $limiteCancelacion = $horaInicio->copy()->subHours(2);
+    
+            if (now()->greaterThanOrEqualTo($limiteCancelacion)) {
+                $this->logWarning('Intento de cancelación fuera de plazo', [
+                    'reserva_id' => $id,
+                    'hora_inicio' => $horaInicio->toDateTimeString(),
+                    'limite' => $limiteCancelacion->toDateTimeString(),
+                    'ahora' => now()->toDateTimeString(),
+                ]);
+    
+                return view('reservas.cancelacion', [
+                    'estado' => 'fuera_de_tiempo',
+                    'reserva' => $reserva
+                ]);
+            }
+    
+            // Cancelar la reserva
             $reserva->estado = 'cancelada';
             $reserva->save();
-
+    
             $this->logInfo('Reserva cancelada exitosamente', ['reserva_id' => $id]);
-
-            // Enviar correo de confirmación de cancelación
-            $this->emailService->enviarCorreoCancelacionCliente($reserva);
-
+    
+            // // Enviar correo de confirmación de cancelación
+            // $this->emailService->enviarCorreoCancelacionCliente($reserva);
             return view('reservas.cancelacion', [
                 'estado' => 'cancelada',
                 'reserva' => $reserva
@@ -427,4 +445,5 @@ class ReservaController extends Controller
             ]);
         }
     }
+    
 } 

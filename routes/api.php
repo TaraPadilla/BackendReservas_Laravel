@@ -20,30 +20,23 @@ use Illuminate\Support\Facades\Mail;
 | API Routes
 |--------------------------------------------------------------------------
 */
-
 // Ruta de prueba
 Route::get('/test', function () {
     return response()->json(['message' => 'API funcionando correctamente']);
 });
 
-
-    Route::get('/test-email', function (EmailService $emailService) {
-    $reserva = Reserva::first(); // Asegúrate de tener alguna reserva en la base de datos
-
-    if (!$reserva) {
-        return 'No hay reservas en la base de datos.';
-    }
-
+Route::get('/enviar-prueba', function () {
     try {
-        $emailService->enviarCorreoConfirmacionCliente($reserva);
-        $emailService->enviarCorreoNotificacionAdmin($reserva);
-        return 'Correos enviados correctamente.';
-    } catch (\Throwable $e) {
+        \Mail::raw('Este es un correo de prueba para verificar SMTP.', function ($message) {
+            $message->to('tarapadilla90@gmail.com')
+                    ->subject('Prueba SMTP desde Laravel');
+        });
+
+        return 'Correo enviado correctamente';
+    } catch (\Exception $e) {
         return 'Error al enviar: ' . $e->getMessage();
     }
 });
-
-
 
 // Ruta para cancelar reserva mediante enlace en correo
 Route::get('/reservas/cancelar/{id}', [ReservaController::class, 'cancelarReservaPorEnlace'])
@@ -89,10 +82,12 @@ Route::get('reservas/verificar-disponibilidad', [ReservaController::class, 'veri
     Route::apiResource('horarios-combinaciones', HorarioCombinacionController::class);
     
     // Rutas para Reservas
-    Route::apiResource('reservas', ReservaController::class);
+    Route::delete('reservas/{id}', [ReservaController::class, 'cancelarPorAdmin']);
+    Route::apiResource('reservas', ReservaController::class)->except(['destroy']);
     Route::post('reservas/{reserva}/confirmar', [ReservaController::class, 'confirmar']);
     Route::post('reservas/{id}', [ReservaController::class, 'cancelarReserva']);
     Route::get('reservas/por-fecha/{fecha}', [ReservaController::class, 'porFecha']);
+
 
     // Rutas de Clientes
     Route::apiResource('clientes', ClienteController::class);

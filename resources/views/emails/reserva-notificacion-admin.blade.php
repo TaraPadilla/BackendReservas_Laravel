@@ -76,11 +76,6 @@
 <body>
     <div class="container">
         <div class="header">
-            @if($restaurante->logo)
-                <img src="{{ $restaurante->logo }}" alt="{{ $restaurante->nombre }}" class="logo">
-            @else
-                <h1>{{ $restaurante->nombre }}</h1>
-            @endif
             <h2>Nueva Reserva Registrada</h2>
         </div>
         
