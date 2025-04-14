@@ -46,8 +46,6 @@ class EmailService
                 $cancelarUrl = config('app.url') . $cancelarUrl;
             }
 
-            $cliente->email = 'tarapadilla90@gmail.com';
-            $cliente->nombre = 'Tarap';
             $this->logInfo('Información del cliente', ['cliente' => $cliente->toArray()]);
 
             Mail::send('emails.reserva-confirmacion-cliente', [
@@ -88,12 +86,7 @@ class EmailService
             $mesa = $reserva->mesa;
             $sede = $mesa->sede;
             $restaurante = $sede->restaurante;
-
-            // Obtener el correo del administrador de la sede
-            // Nota: Esto asume que existe un campo email en la tabla sedes o en una tabla relacionada
-            // Ajusta esto según tu estructura de base de datos
-            $adminEmail = $sede->email ?? config('mail.from.address');
-            $adminEmail = 'tarapadilla90@gmail.com';
+            $adminEmail = $sede->admin_email;
 
             Mail::send('emails.reserva-notificacion-admin', [
                 'reserva' => $reserva,

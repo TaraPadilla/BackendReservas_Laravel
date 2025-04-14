@@ -55,7 +55,7 @@ Route::get('reservas/verificar-disponibilidad', [ReservaController::class, 'veri
     
     // Rutas para Sedes
     Route::apiResource('sedes', SedeController::class);
-    
+    Route::get('sedes/es/{slug}', [SedeController::class, 'buscarPorSlug']);
     // Rutas para Mesas
     Route::apiResource('mesas', MesaController::class);
     Route::get('/sedes/{sede}/disponibilidad', [MesaController::class, 'obtenerSimulacionDisponibilidad']);

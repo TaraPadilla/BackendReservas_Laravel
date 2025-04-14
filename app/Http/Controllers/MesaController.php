@@ -246,6 +246,28 @@ class MesaController extends Controller
         }
     }
 
+    private function filtrarHorariosPasados(array $horarios): array
+    {
+        $this->logInfo('Filtrando horarios pasados', ['horarios' => $horarios]);
+        if (!$this->esHoy()) {
+            $this->logInfo('No es hoy, devolviendo todos los horarios', ['horarios' => $horarios]);
+            return $horarios;
+        }
+    
+        $this->logInfo('Zona horaria actual', ['timezone' => date_default_timezone_get()]);
+        $this->logInfo('Hora actual', ['hora_actual' => date('H:i')]);
+
+        $horaActual = (new \DateTime('now', new \DateTimeZone(date_default_timezone_get())))->format('H:i');
+        $this->logInfo('Hora actual', ['hora_actual' => $horaActual]);  
+    
+        return array_values(array_filter($horarios, fn($hora) => $hora > $horaActual));
+    }
+
+    private function esHoy(): bool
+    {
+        return request()->input('fecha') === now()->toDateString();
+    }
+
     public function obtenerSimulacionDisponibilidad(Request $request, $sedeId)
     {
         try {
@@ -351,6 +373,7 @@ class MesaController extends Controller
             }
 
     
+            $fecha = now()->toDateString();
             // Formatear mesas
             $mesasFormateadas = $mesas->map(function ($mesa) {
                 return [
@@ -360,7 +383,8 @@ class MesaController extends Controller
                     'capacidad_max' => $mesa->capacidad_max,
                     'combinable' => $mesa->combinable,
                     'es_combinacion' => false,
-                    'horarios' => $mesa->horarios->pluck('hora')->toArray()
+                    'horarios' => $this->filtrarHorariosPasados($mesa->horarios->pluck('hora')->toArray())
+                    //'horarios' => $mesa->horarios->pluck('hora')->toArray()
                 ];
             });
     
@@ -373,6 +397,7 @@ class MesaController extends Controller
                     'capacidad_max' => $combinacion->capacidad_max,
                     'combinable' => false,
                     'es_combinacion' => true,
+                    //'horarios' => $this->filtrarHorariosPasados($combinacion->mesaPrincipal->horarios->pluck('hora')->toArray())
                     'horarios' => $combinacion->mesaPrincipal->horarios->pluck('hora')->toArray()
                 ];
             });

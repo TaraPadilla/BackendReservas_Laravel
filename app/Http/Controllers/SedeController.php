@@ -108,6 +108,18 @@ class SedeController extends Controller
         }
     }
 
+    public function buscarPorSlug($slug)
+    {
+        try {
+            $sede = Sede::where('slug', $slug)->firstOrFail();
+            $this->logInfo('Obteniendo detalles de sede por slug', ['slug' => $slug, 'sede_id' => $sede->id]);
+            return $sede->load(['restaurante', 'mesas', 'combinacionesMesas']);
+        } catch (\Exception $e) {
+            $this->logError('Error al obtener detalles de sede por slug', $e);
+            return response()->json(['message' => 'Error al obtener los detalles de la sede'], 500);
+        }
+    }
+
     public function update(Request $request, Sede $sede)
     {
         try {
