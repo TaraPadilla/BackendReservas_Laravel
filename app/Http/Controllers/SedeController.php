@@ -203,12 +203,12 @@ class SedeController extends Controller
         }
     }
 
-    public function destroy(Sede $sede)
+    public function destroy($id)
     {
         try {
+            $sede = Sede::findOrFail($id);
             $this->logInfo('Iniciando eliminación de sede', ['sede_id' => $sede->id]);
             $sede->delete();
-            $this->logInfo('Sede eliminada exitosamente', ['sede_id' => $sede->id]);
             return response()->json(null, 204);
         } catch (\Exception $e) {
             $this->logError('Error al eliminar sede', $e);

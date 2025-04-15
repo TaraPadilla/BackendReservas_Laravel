@@ -131,8 +131,24 @@ class HorarioSemanalController extends Controller
                 'lunch_start' => 'nullable|required_if:is_closed,false|date_format:H:i',
                 'lunch_end' => 'nullable|required_if:is_closed,false|date_format:H:i|after:lunch_start',
                 'dinner_start' => 'nullable|required_if:is_closed,false|date_format:H:i',
-                'dinner_end' => 'nullable|required_if:is_closed,false|date_format:H:i|after:dinner_start'
+                'dinner_end' => 'nullable|required_if:is_closed,false|date_format:H:i',
             ]);
+
+            if (!$validated['is_closed'] && $validated['dinner_start'] && $validated['dinner_end']) {
+                $start = \Carbon\Carbon::createFromFormat('H:i', $validated['dinner_start']);
+                $end = \Carbon\Carbon::createFromFormat('H:i', $validated['dinner_end']);
+            
+                if ($end->lte($start)) {
+                    // Si termina antes o igual, asumimos que cruza medianoche
+                    $end->addDay(); // Lo movemos al día siguiente
+                }
+            
+                if ($start->diffInHours($end) > 8) {
+                    return response()->json([
+                        'message' => 'La duración del turno de cena no puede superar las 8 horas'
+                    ], 422);
+                }
+            }
 
             // Validar que al menos un turno esté definido si no está cerrado
             if (!$validated['is_closed']) {
