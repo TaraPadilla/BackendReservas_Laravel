@@ -42,11 +42,12 @@ class SedeController extends Controller
     public function store(Request $request)
     {
         try {
-            $this->logInfo('Iniciando creación de sede', $request->except(['image_card', 'image_banner']));
+            $this->logInfo('Iniciando creación de sede', $request->except(['image_card', 'image_banner', 'image_logo']));
 
             $this->logInfo('Archivos recibidos', [
                 'image_card' => $request->file('image_card'),
-                'image_banner' => $request->file('image_banner')
+                'image_banner' => $request->file('image_banner'),
+                'image_logo' => $request->file('image_logo')
             ]);
 
             // Validar campos de texto
@@ -84,6 +85,17 @@ class SedeController extends Controller
                 $filename = 'banner_' . time() . '.' . $file->getClientOriginalExtension();
                 $file->move(public_path('assets/images'), $filename);
                 $validated['image_banner'] = '/assets/images/' . $filename;
+            }
+
+            // Validar y guardar image_logo si viene
+            if ($request->hasFile('image_logo')) {
+                $file = $request->file('image_logo');
+                if (!$file->isValid() || !$file->isFile()) {
+                    throw new \Exception('Imagen de logo inválida');
+                }
+                $filename = 'logo_' . time() . '.' . $file->getClientOriginalExtension();
+                $file->move(public_path('assets/images'), $filename);
+                $validated['image_logo'] = '/assets/images/' . $filename;
             }
 
             $sede = Sede::create($validated);
@@ -125,12 +137,13 @@ class SedeController extends Controller
         try {
             $this->logInfo('Iniciando actualización de sede', [
                 'sede_id' => $sede->id,
-                'datos' => $request->except(['image_card', 'image_banner'])
+                'datos' => $request->except(['image_card', 'image_banner', 'image_logo'])
             ]);
 
             $this->logInfo('Archivos recibidos', [
                 'image_card' => $request->file('image_card'),
-                'image_banner' => $request->file('image_banner')
+                'image_banner' => $request->file('image_banner'),
+                'image_logo' => $request->file('image_logo')
             ]);
 
             // Validar campos de texto
@@ -166,6 +179,17 @@ class SedeController extends Controller
                 $filename = 'banner_' . time() . '.' . $file->getClientOriginalExtension();
                 $file->move(public_path('assets/images'), $filename);
                 $validated['image_banner'] = '/assets/images/' . $filename;
+            }
+
+            // Validar y guardar image_logo si viene
+            if ($request->hasFile('image_logo')) {
+                $file = $request->file('image_logo');
+                if (!$file->isValid() || !$file->isFile()) {
+                    throw new \Exception('Imagen de logo inválida');
+                }
+                $filename = 'logo_' . time() . '.' . $file->getClientOriginalExtension();
+                $file->move(public_path('assets/images'), $filename);
+                $validated['image_logo'] = '/assets/images/' . $filename;
             }
 
             $sede->update($validated);

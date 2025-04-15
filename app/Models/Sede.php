@@ -14,6 +14,7 @@ class Sede extends Model
     protected $fillable = [
         'restaurante_id',
         'nombre',
+        'slug',
         'direccion',
         'ciudad',
         'telefono',
@@ -22,6 +23,7 @@ class Sede extends Model
         'descripcion',
         'image_card',
         'image_banner',
+        'image_logo',
         'activo'
     ];
 
