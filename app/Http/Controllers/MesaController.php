@@ -13,6 +13,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
 use App\Models\CombinacionMesa;
+use App\Models\HorarioSemanal;
+
+
 class MesaController extends Controller
 {
     use LogTrait;
@@ -272,6 +275,7 @@ class MesaController extends Controller
     {
         try {
             $fecha = $request->input('fecha');
+            $this->logInfo('Fecha de simulación', ['fecha' => $fecha]);
             $turno = $request->input('turno');
     
             if (!$fecha || !$turno) {
@@ -372,10 +376,16 @@ class MesaController extends Controller
                 }
             }
 
-    
-            $fecha = now()->toDateString();
+            $horariosPorDia = HorarioSemanal::where('sede_id', $sedeId)
+                ->get()
+                ->keyBy('day_of_week');
+
             // Formatear mesas
-            $mesasFormateadas = $mesas->map(function ($mesa) {
+            $mesasFormateadas = $mesas->map(function ($mesa) use ($fecha, $turno, $sedeId, $horariosPorDia) {
+                $horariosOriginales = $mesa->horarios->pluck('hora')->toArray();
+                $horariosValidos = $this->filtrarHorariosSegunHorarioSemanal($horariosOriginales, $fecha, $turno, $sedeId, $horariosPorDia);
+                $horariosVisibles = $this->filtrarHorariosPasados($horariosValidos);
+            
                 return [
                     'id' => $mesa->id,
                     'numero' => $mesa->numero,
@@ -383,13 +393,16 @@ class MesaController extends Controller
                     'capacidad_max' => $mesa->capacidad_max,
                     'combinable' => $mesa->combinable,
                     'es_combinacion' => false,
-                    'horarios' => $this->filtrarHorariosPasados($mesa->horarios->pluck('hora')->toArray())
-                    //'horarios' => $mesa->horarios->pluck('hora')->toArray()
+                    'horarios' => $horariosVisibles
                 ];
             });
     
             // Formatear combinaciones
-            $combinacionesFormateadas = $combinaciones->map(function ($combinacion) {
+            $combinacionesFormateadas = $combinaciones->map(function ($combinacion) use ($fecha, $turno, $sedeId, $horariosPorDia) {
+                $horariosOriginales = $combinacion->mesaPrincipal->horarios->pluck('hora')->toArray();
+                $horariosValidos = $this->filtrarHorariosSegunHorarioSemanal($horariosOriginales, $fecha, $turno, $sedeId, $horariosPorDia);
+                $horariosVisibles = $this->filtrarHorariosPasados($horariosValidos);
+            
                 return [
                     'id' => $combinacion->id,
                     'numero' => $combinacion->id,
@@ -397,10 +410,10 @@ class MesaController extends Controller
                     'capacidad_max' => $combinacion->capacidad_max,
                     'combinable' => false,
                     'es_combinacion' => true,
-                    //'horarios' => $this->filtrarHorariosPasados($combinacion->mesaPrincipal->horarios->pluck('hora')->toArray())
-                    'horarios' => $combinacion->mesaPrincipal->horarios->pluck('hora')->toArray()
+                    'horarios' => $horariosVisibles
                 ];
             });
+            
     
             // Unir mesas + combinaciones
             $mesasYCombinaciones = $mesasFormateadas->merge($combinacionesFormateadas)->values();
@@ -423,4 +436,42 @@ class MesaController extends Controller
             ], 500);
         }
     }
+
+    private function filtrarHorariosSegunHorarioSemanal(array $horarios, string $fecha, string $turno, int $sedeId, $horariosPorDia): array
+    {
+        $this->logInfo('Filtrando horarios según horario semanal', compact('horarios', 'fecha', 'turno', 'sedeId'));
+    
+        if (!\App\Models\HorarioSemanal::estaAbierto($fecha, $turno, $sedeId)) {
+            $this->logInfo('⛔ Turno no disponible según horario semanal', compact('fecha', 'turno', 'sedeId'));
+            return [];
+        }
+    
+        $diaSemana = \Carbon\Carbon::parse($fecha)->dayOfWeek;
+        $horario = $horariosPorDia->get($diaSemana);
+    
+        $inicio = $turno === 'comida' ? $horario->lunch_start : $horario->dinner_start;
+        $fin    = $turno === 'comida' ? $horario->lunch_end   : $horario->dinner_end;
+    
+        try {
+            $inicioC = \Carbon\Carbon::createFromFormat('H:i', $inicio->format('H:i'))->setDate(2000, 1, 1);
+            $finC    = \Carbon\Carbon::createFromFormat('H:i', $fin->format('H:i'))->setDate(2000, 1, 1);
+            if ($finC->lte($inicioC)) $finC->addDay();
+        } catch (\Exception $e) {
+            \Log::error('❌ Error al procesar rango del turno', ['inicio' => $inicio, 'fin' => $fin, 'error' => $e->getMessage()]);
+            return [];
+        }
+    
+        $filtrados = array_filter($horarios, function ($hora) use ($inicioC, $finC) {
+            try {
+                $limpia = substr(trim((string) $hora), 0, 5);
+                $h = \Carbon\Carbon::createFromFormat('H:i', $limpia)->setDate(2000, 1, 1);
+                return $h->between($inicioC, $finC);
+            } catch (\Exception $e) {
+                return false;
+            }
+        });
+    
+        return array_values($filtrados);
+    }
+    
 } 

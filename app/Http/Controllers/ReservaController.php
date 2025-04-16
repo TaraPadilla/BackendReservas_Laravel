@@ -34,6 +34,16 @@ class ReservaController extends Controller
             $this->logInfo('Obteniendo lista de reservas');
             $reservas = Reserva::with(['mesa', 'cliente', 'combinacionMesa'])->get();
             $this->logInfo('Lista de reservas obtenida', ['total' => $reservas->count()]);
+            // Agregar mesas_combinadas manualmente si aplica
+            foreach ($reservas as $reserva) {
+                if ($reserva->combinacionMesa) {
+                    $mesas = $reserva->combinacionMesa->obtenerMesasCombinadas()
+                        ->map(fn($mesa) => ['id' => $mesa->id, 'numero' => $mesa->numero])
+                        ->values();
+                    $reserva->combinacionMesa->mesas_combinadas = $mesas;
+                }
+            }
+
             return $reservas;
         } catch (\Exception $e) {
             $this->logError('Error al obtener lista de reservas', $e);

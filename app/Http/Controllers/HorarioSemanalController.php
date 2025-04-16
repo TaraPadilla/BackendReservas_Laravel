@@ -51,10 +51,10 @@ class HorarioSemanalController extends Controller
                     return $query->where('sede_id', $request->sede_id);
                 })],
                 'is_closed' => 'required|boolean',
-                'lunch_start' => 'nullable|required_if:is_closed,false|date_format:H:i',
-                'lunch_end' => 'nullable|required_if:is_closed,false|date_format:H:i|after:lunch_start',
-                'dinner_start' => 'nullable|required_if:is_closed,false|date_format:H:i',
-                'dinner_end' => 'nullable|required_if:is_closed,false|date_format:H:i|after:dinner_start'
+'lunch_start' => 'nullable|date_format:H:i',
+'lunch_end' => 'nullable|date_format:H:i|after:lunch_start',
+'dinner_start' => 'nullable|date_format:H:i',
+'dinner_end' => 'nullable|date_format:H:i|after:dinner_start'
             ]);
 
             // Validar que al menos un turno esté definido si no está cerrado
@@ -128,10 +128,10 @@ class HorarioSemanalController extends Controller
                 'sede_id' => 'required|exists:sedes,id',
                 'day_of_week' => 'required|integer|between:0,6',
                 'is_closed' => 'required|boolean',
-                'lunch_start' => 'nullable|required_if:is_closed,false|date_format:H:i',
-                'lunch_end' => 'nullable|required_if:is_closed,false|date_format:H:i|after:lunch_start',
-                'dinner_start' => 'nullable|required_if:is_closed,false|date_format:H:i',
-                'dinner_end' => 'nullable|required_if:is_closed,false|date_format:H:i',
+'lunch_start' => 'nullable|date_format:H:i',
+'lunch_end' => 'nullable|date_format:H:i|after:lunch_start',
+'dinner_start' => 'nullable|date_format:H:i',
+'dinner_end' => 'nullable|date_format:H:i|after:dinner_start'
             ]);
 
             if (!$validated['is_closed'] && $validated['dinner_start'] && $validated['dinner_end']) {

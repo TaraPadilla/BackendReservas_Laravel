@@ -52,4 +52,18 @@ class Reserva extends Model
     {
         return $this->belongsTo(CombinacionMesa::class, 'combinacion_mesa_id');
     }
+
+    public function toArray()
+    {
+        $array = parent::toArray();
+    
+        // Forzar 'fecha' como string tipo "YYYY-MM-DD"
+        $array['fecha'] = $this->fecha instanceof \Carbon\Carbon
+            ? $this->fecha->toDateString()
+            : $this->fecha;
+
+        return $array;
+    }
+    
+
 } 

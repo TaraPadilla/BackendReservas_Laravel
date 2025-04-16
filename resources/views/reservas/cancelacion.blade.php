@@ -89,14 +89,6 @@
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            @if(isset($reserva) && $reserva->mesa->sede->restaurante->logo)
-                <img src="{{ $reserva->mesa->sede->restaurante->logo }}" alt="{{ $reserva->mesa->sede->restaurante->nombre }}" class="logo">
-            @else
-                <h1>{{ isset($reserva) ? $reserva->mesa->sede->restaurante->nombre : 'Restaurante' }}</h1>
-            @endif
-        </div>
-
         @if($estado === 'cancelada')
             <div class="status-icon success">✓</div>
             <h2 class="title">¡Reserva Cancelada!</h2>
@@ -111,8 +103,6 @@
             </div>
 
             <p>Se ha enviado un correo de confirmación a tu dirección de email.</p>
-            <a href="/" class="button">Volver al inicio</a>
-
         @elseif($estado === 'ya_cancelada')
             <div class="status-icon warning">!</div>
             <h2 class="title">Reserva Ya Cancelada</h2>
@@ -125,9 +115,6 @@
                 <p><strong>Hora:</strong> {{ $reserva->hora_inicio }} - {{ $reserva->hora_fin }}</p>
                 <p><strong>Número de personas:</strong> {{ $reserva->num_personas }}</p>
             </div>
-
-            <a href="/" class="button">Volver al inicio</a>
-
         @elseif($estado === 'fuera_de_tiempo')
             <div class="status-icon warning">⏱</div>
             <h2 class="title">Cancelación No Permitida</h2>
@@ -139,7 +126,6 @@
             </div>
 
             <p>Si necesitas ayuda, por favor contacta directamente con el restaurante.</p>
-            <a href="/" class="button">Volver al inicio</a>
 
         @else
             <div class="status-icon error">✕</div>
@@ -147,7 +133,6 @@
             <p class="message">{{ $mensaje ?? 'Ha ocurrido un error al procesar tu solicitud.' }}</p>
 
             <p>Por favor, contacta con el restaurante para obtener ayuda.</p>
-            <a href="/" class="button">Volver al inicio</a>
         @endif
 
         <div class="footer">

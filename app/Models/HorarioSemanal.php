@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Carbon\Carbon;
+use Log;
 
 class HorarioSemanal extends Model
 {
@@ -88,4 +90,32 @@ class HorarioSemanal extends Model
 
         return $lunchDefined || $dinnerDefined;
     }
+
+    public static function estaAbierto(string $fecha, string $turno, int $sedeId): bool
+    {
+        $dia = \Carbon\Carbon::parse($fecha)->dayOfWeek;
+    
+        $horario = self::where('sede_id', $sedeId)
+            ->where('day_of_week', $dia)
+            ->first();
+    
+        \Log::info('⏱️ Verificando horario en modelo', [
+            'fecha' => $fecha,
+            'dia' => $dia,
+            'turno' => $turno,
+            'sedeId' => $sedeId,
+            'encontrado' => !!$horario,
+            'is_closed' => $horario?->is_closed,
+            'lunch' => [$horario?->lunch_start, $horario?->lunch_end],
+            'dinner' => [$horario?->dinner_start, $horario?->dinner_end],
+        ]);
+    
+        if (!$horario || $horario->is_closed) return false;
+    
+        return $turno === 'comida'
+            ? ($horario->lunch_start && $horario->lunch_end)
+            : ($horario->dinner_start && $horario->dinner_end);
+    }
+    
+
 } 
