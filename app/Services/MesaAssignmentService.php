@@ -245,14 +245,11 @@ class MesaAssignmentService
             if ($asignacion instanceof Mesa) {
                 $reserva->mesa_id = $asignacion->id;
                 $reserva->combinacion_mesa_id = null;
-                //$asignacion->update(['estado' => 'reservada']);
-            } else {
+            } elseif ($asignacion instanceof CombinacionMesa) {
                 $reserva->mesa_id = null;
                 $reserva->combinacion_mesa_id = $asignacion->id;
-                // Actualizar estado de todas las mesas de la combinación
-                foreach ($asignacion->mesas as $mesa) {
-                    //$mesa->update(['estado' => 'reservada']);
-                }
+            } else {
+                throw new \Exception('Tipo de asignación no válido: debe ser Mesa o CombinacionMesa');
             }
 
             $reserva->save();

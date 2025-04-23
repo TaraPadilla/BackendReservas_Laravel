@@ -180,7 +180,7 @@ class ReservaController extends Controller
                     'estado' => 'confirmada'
                 ]);
 
-                $this->mesaAssignmentService->asignarMesa($reserva, $mesaSeleccionada);
+                //$this->mesaAssignmentService->asignarMesa($reserva, $mesaSeleccionada);
             } else {
                 //calcula la hora fin
                 $horaFin = Carbon::parse($validated['hora_inicio'])
@@ -198,7 +198,7 @@ class ReservaController extends Controller
                     'estado' => 'confirmada'
                 ]);
 
-                $this->mesaAssignmentService->asignarMesa($reserva, $mesaSeleccionada);
+                //$this->mesaAssignmentService->asignarMesa($reserva, $mesaSeleccionada);
             }
 
 

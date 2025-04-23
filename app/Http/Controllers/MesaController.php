@@ -251,17 +251,17 @@ class MesaController extends Controller
 
     private function filtrarHorariosPasados(array $horarios): array
     {
-        $this->logInfo('Filtrando horarios pasados', ['horarios' => $horarios]);
+        //$this->logInfo('Filtrando horarios pasados', ['horarios' => $horarios]);
         if (!$this->esHoy()) {
-            $this->logInfo('No es hoy, devolviendo todos los horarios', ['horarios' => $horarios]);
+            //$this->logInfo('No es hoy, devolviendo todos los horarios', ['horarios' => $horarios]);
             return $horarios;
         }
     
-        $this->logInfo('Zona horaria actual', ['timezone' => date_default_timezone_get()]);
-        $this->logInfo('Hora actual', ['hora_actual' => date('H:i')]);
+        //$this->logInfo('Zona horaria actual', ['timezone' => date_default_timezone_get()]);
+        //$this->logInfo('Hora actual', ['hora_actual' => date('H:i')]);
 
         $horaActual = (new \DateTime('now', new \DateTimeZone(date_default_timezone_get())))->format('H:i');
-        $this->logInfo('Hora actual', ['hora_actual' => $horaActual]);  
+        //$this->logInfo('Hora actual', ['hora_actual' => $horaActual]);  
     
         return array_values(array_filter($horarios, fn($hora) => $hora > $horaActual));
     }
@@ -270,6 +270,79 @@ class MesaController extends Controller
     {
         return request()->input('fecha') === now()->toDateString();
     }
+
+    private function obtenerHorariosSolapados(
+        array $horariosDefinidos,
+        string $horaInicioReserva,
+        string $horaFinReserva,
+        array $horasReservadas = [],
+        int $duracionMinutos = null
+    ): array {
+        $inicio = Carbon::createFromFormat('H:i:s', $horaInicioReserva);
+        $fin = Carbon::createFromFormat('H:i:s', $horaFinReserva)->subMinute(); // opcional, para excluir el fin exacto
+    
+        $ocupadosPorReserva = collect($horariosDefinidos)->filter(function ($hora) use ($inicio, $fin) {
+            $horaComparar = Carbon::createFromFormat('H:i:s', $hora);
+            return $horaComparar->between($inicio, $fin);
+        })->values()->all();
+    
+        $bloqueadosPorSolapamiento = [];
+    
+        // Validar contra otras reservas en conflicto
+        if (!empty($horasReservadas) && $duracionMinutos !== null) {
+            foreach ($horariosDefinidos as $horaCandidata) {
+                $inicioCandidato = Carbon::createFromFormat('H:i:s', $horaCandidata);
+                $finCandidato = (clone $inicioCandidato)->addMinutes($duracionMinutos);
+    
+                foreach ($horasReservadas as $horaReservada) {
+                    $inicioReserva = Carbon::createFromFormat('H:i:s', $horaReservada);
+                    $finReserva = (clone $inicioReserva)->addMinutes($duracionMinutos);
+    
+                    if (
+                        $inicioCandidato->lt($finReserva) &&
+                        $finCandidato->gt($inicioReserva)
+                    ) {
+                        $bloqueadosPorSolapamiento[] = $horaCandidata;
+    
+                        $this->logInfo('🟡 Conflicto con otra reserva', [
+                            'hora_candidata' => $horaCandidata,
+                            'inicio_candidato' => $inicioCandidato->format('H:i'),
+                            'fin_candidato' => $finCandidato->format('H:i'),
+                            'inicio_reserva' => $inicioReserva->format('H:i'),
+                            'fin_reserva' => $finReserva->format('H:i'),
+                        ]);
+                        break;
+                    }
+                }
+            }
+        }
+    
+        // Validar contra esta misma reserva
+        if ($duracionMinutos !== null) {
+            foreach ($horariosDefinidos as $horaCandidata) {
+                $inicioCandidato = Carbon::createFromFormat('H:i:s', $horaCandidata);
+                $finCandidato = (clone $inicioCandidato)->addMinutes($duracionMinutos);
+    
+                if (
+                    $inicioCandidato->lt($fin) &&
+                    $finCandidato->gt($inicio)
+                ) {
+                    $bloqueadosPorSolapamiento[] = $horaCandidata;
+    
+                    $this->logInfo('🔴 Conflicto con la propia reserva', [
+                        'hora_candidata' => $horaCandidata,
+                        'inicio_candidato' => $inicioCandidato->format('H:i'),
+                        'fin_candidato' => $finCandidato->format('H:i'),
+                        'inicio_reserva' => $inicio->format('H:i'),
+                        'fin_reserva' => $fin->format('H:i'),
+                    ]);
+                }
+            }
+        }
+    
+        return array_values(array_unique(array_merge($ocupadosPorReserva, $bloqueadosPorSolapamiento)));
+    }
+    
 
     public function obtenerSimulacionDisponibilidad(Request $request, $sedeId)
     {
@@ -294,6 +367,7 @@ class MesaController extends Controller
             // Obtener mesas activas con horarios del turno
             $mesas = Mesa::where('sede_id', $sedeId)
                 ->where('activa', true)
+                ->where('estado', 'disponible')
                 ->with(['horarios' => function ($query) use ($turno) {
                     $query->where('tipo_turno', $turno);
                 }])
@@ -316,11 +390,22 @@ class MesaController extends Controller
                 ->get();
     
             // Agrupar horarios ocupados por mesa directa
-            $horariosOcupadosUnificados = $reservas
-                ->groupBy('mesa_id')
-                ->map(fn($res) => $res->pluck('hora_inicio')->toArray())
-                ->toArray();
-    
+            $horariosOcupadosUnificados = [];
+
+            foreach ($reservas as $reserva) {
+                $mesaId = $reserva->mesa_id;
+                $mesa = $mesas->firstWhere('id', $mesaId);
+            
+                if (!$mesa || !$mesa->horarios) continue;
+            
+                $horariosDefinidos = $mesa->horarios->pluck('hora')->toArray();
+                $horariosSolapados = $this->obtenerHorariosSolapados($horariosDefinidos, $reserva->hora_inicio, $reserva->hora_fin);
+            
+                foreach ($horariosSolapados as $hora) {
+                    $horariosOcupadosUnificados[$mesaId][] = $hora;
+                }
+            }
+            
             // Obtener reservas por combinaciones
             $reservasCombinadas = Reserva::whereNotNull('combinacion_mesa_id')
                 ->whereDate('fecha', $fecha)
@@ -330,26 +415,48 @@ class MesaController extends Controller
     
             foreach ($reservasCombinadas as $reserva) {
                 $combinacion = $reserva->combinacionMesa;
-    
+            
                 if (!$combinacion) continue;
-
+            
                 $this->logInfo("💡 Procesando reserva combinada", [
                     'reserva_id' => $reserva->id,
                     'combinacion_id' => $combinacion->id ?? null,
-                    'mesas_combinadas' => $combinacion->mesas_combinadas_ids ?? [],
+                    'mesas_combinadas' => $combinacion->mesas_combinadas_ids ?? []
                 ]);
-    
-                // Mesa principal
-                $horariosOcupadosUnificados[$combinacion->mesa_id][] = $reserva->hora_inicio;
-    
-                // Mesas combinadas
-                foreach ($combinacion->obtenerMesasCombinadas() as $mesa) {
-                    $horariosOcupadosUnificados[$mesa->id][] = $reserva->hora_inicio;
+            
+                // Obtener horarios definidos en la mesa principal
+                $horariosDefinidos = collect($combinacion->mesaPrincipal->horarios)->pluck('hora')->toArray();
+            
+                // Obtener horarios ya ocupados por esta combinación (si existen)
+                $horasReservadas = $reservasCombinadas
+                    ->filter(fn($r) => $r->combinacion_mesa_id === $combinacion->id && $r->id !== $reserva->id)
+                    ->pluck('hora_inicio')
+                    ->toArray();
+            
+                // Duración del turno de la combinación
+                $duracion = $combinacion->duracion_turno_minutos;
+                //log duracion
+                $this->logInfo("Duración del turno de la combinación", ['duracion' => $duracion, 'reserva_id' => $reserva->id]);
+            
+                // Obtener todos los horarios que deben marcarse como ocupados
+                $horariosSolapados = $this->obtenerHorariosSolapados(
+                    $horariosDefinidos,
+                    $reserva->hora_inicio,
+                    $reserva->hora_fin,
+                    $horasReservadas,
+                    $duracion
+                );
+            
+                // Marcar horarios como ocupados en combinación y sus mesas
+                foreach ($horariosSolapados as $hora) {
+                    $horariosOcupadosUnificados[$combinacion->id][] = $hora;
+                    $horariosOcupadosUnificados[$combinacion->mesa_id][] = $hora;
+                    foreach ($combinacion->obtenerMesasCombinadas() as $mesa) {
+                        $horariosOcupadosUnificados[$mesa->id][] = $hora;
+                    }
                 }
-    
-                // ID de la combinación (usado en el frontend)
-                $horariosOcupadosUnificados[$combinacion->id][] = $reserva->hora_inicio;
             }
+                
     
             // Eliminar duplicados
             foreach ($horariosOcupadosUnificados as $id => $horas) {
@@ -417,7 +524,9 @@ class MesaController extends Controller
     
             // Unir mesas + combinaciones
             $mesasYCombinaciones = $mesasFormateadas->merge($combinacionesFormateadas)->values();
-    
+            $this->logInfo('Mesas y combinaciones', ['mesas' => $mesasYCombinaciones]);
+            $this->logInfo('Horarios ocupados', ['horarios' => $horariosOcupadosUnificados]);
+
             return response()->json([
                 'status' => 'success',
                 'data' => [
@@ -439,10 +548,10 @@ class MesaController extends Controller
 
     private function filtrarHorariosSegunHorarioSemanal(array $horarios, string $fecha, string $turno, int $sedeId, $horariosPorDia): array
     {
-        $this->logInfo('Filtrando horarios según horario semanal', compact('horarios', 'fecha', 'turno', 'sedeId'));
+        //$this->logInfo('Filtrando horarios según horario semanal', compact('horarios', 'fecha', 'turno', 'sedeId'));
     
         if (!\App\Models\HorarioSemanal::estaAbierto($fecha, $turno, $sedeId)) {
-            $this->logInfo('⛔ Turno no disponible según horario semanal', compact('fecha', 'turno', 'sedeId'));
+            //$this->logInfo('⛔ Turno no disponible según horario semanal', compact('fecha', 'turno', 'sedeId'));
             return [];
         }
     

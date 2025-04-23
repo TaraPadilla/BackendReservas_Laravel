@@ -99,16 +99,16 @@ class HorarioSemanal extends Model
             ->where('day_of_week', $dia)
             ->first();
     
-        \Log::info('⏱️ Verificando horario en modelo', [
-            'fecha' => $fecha,
-            'dia' => $dia,
-            'turno' => $turno,
-            'sedeId' => $sedeId,
-            'encontrado' => !!$horario,
-            'is_closed' => $horario?->is_closed,
-            'lunch' => [$horario?->lunch_start, $horario?->lunch_end],
-            'dinner' => [$horario?->dinner_start, $horario?->dinner_end],
-        ]);
+        // \Log::info('⏱️ Verificando horario en modelo', [
+        //     'fecha' => $fecha,
+        //     'dia' => $dia,
+        //     'turno' => $turno,
+        //     'sedeId' => $sedeId,
+        //     'encontrado' => !!$horario,
+        //     'is_closed' => $horario?->is_closed,
+        //     'lunch' => [$horario?->lunch_start, $horario?->lunch_end],
+        //     'dinner' => [$horario?->dinner_start, $horario?->dinner_end],
+        // ]);
     
         if (!$horario || $horario->is_closed) return false;
     
