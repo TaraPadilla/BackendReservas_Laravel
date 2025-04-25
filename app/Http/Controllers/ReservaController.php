@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
+use App\Models\SedeTextosLegales;
 
 class ReservaController extends Controller
 {
@@ -201,14 +202,13 @@ class ReservaController extends Controller
                 //$this->mesaAssignmentService->asignarMesa($reserva, $mesaSeleccionada);
             }
 
-
             $this->logInfo('Reserva creada exitosamente', ['reserva_id' => $reserva->id]);
 
-            // Preparar respuesta
-            $response = response()->json(
-                $reserva->load(['mesa', 'cliente', 'combinacionMesa']),
-                201
-            );
+            $textos = SedeTextosLegales::where('sede_id', $reserva->sede_id ?? $mesaSeleccionada->sede_id ?? null)->first();
+
+            $responseData = $reserva->load(['mesa', 'cliente', 'combinacionMesa']);
+            $responseData->texto_reserva_final = $textos?->texto_reserva_final;
+            $response = response()->json($responseData, 201);
 
             // Enviar correos de confirmación de forma segura (no afecta al cliente si falla)
             try {

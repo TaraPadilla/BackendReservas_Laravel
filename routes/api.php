@@ -15,6 +15,8 @@ use App\Http\Controllers\HorarioSemanalController;
 use App\Services\EmailService;
 use App\Models\Reserva;
 use Illuminate\Support\Facades\Mail;
+use App\Http\Controllers\SedeTextosLegalesController;
+
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -116,5 +118,14 @@ Route::get('reservas/verificar-disponibilidad', [ReservaController::class, 'veri
         Route::get('horarios-servicio/{mesa}', [ReservaController::class, 'obtenerHorariosServicio']);
         Route::get('tipo-turno/{fecha}/{hora}', [ReservaController::class, 'determinarTipoTurno']);
     });
-    
+
+    // Rutas para Textos Legales rutas separadas
+    Route::get('textos-legal/por-sede/{sede}', [SedeTextosLegalesController::class, 'porSede']);
+    Route::put('textos-legal/por-sede/{sede}', [SedeTextosLegalesController::class, 'updatePorSede']);
+    Route::get('textos-legal/{sede_id}', [SedeTextosLegalesController::class, 'show']);     
+    Route::put('textos-legal/{sede_id}', [SedeTextosLegalesController::class, 'update']);
+    Route::post('textos-legal', [SedeTextosLegalesController::class, 'store']);
+    Route::delete('textos-legal/{sede_id}', [SedeTextosLegalesController::class, 'destroy']);
+
+
 //}); 
