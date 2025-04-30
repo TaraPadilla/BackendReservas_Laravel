@@ -23,15 +23,20 @@ class BloqueoMesaController extends Controller
             $this->logInfo('Obteniendo bloqueos de la sede', ['sede_id' => $sedeId]);
 
             $bloqueos = BloqueoMesa::where('sede_id', $sedeId)
-                //->with('sede')
-                ->get()->map(function ($bloqueo) {
+            ->get()
+            ->map(function ($bloqueo) {
                 if ($bloqueo->affected_tables === 'specific') {
                     $bloqueo->load('mesas');
                 }
+                // Forzar que start_date y end_date se tomen crudos de BD
+                $bloqueo->start_date = $bloqueo->getRawOriginal('start_date');
+                $bloqueo->end_date = $bloqueo->getRawOriginal('end_date');
                 return $bloqueo;
             });
-
-            $this->logInfo('Lista de bloqueos obtenida', ['total' => $bloqueos->count()]);
+        
+            // Log con los bloqueos
+            $this->logInfo('Lista de bloqueos obtenida', ['bloqueos' => $bloqueos]);
+            
             return response()->json($bloqueos);
         } catch (\Exception $e) {
             $this->logError('Error al obtener bloqueos', $e);
@@ -181,16 +186,17 @@ class BloqueoMesaController extends Controller
     /**
      * Elimina un bloqueo
      */
-    public function destroy(BloqueoMesa $bloqueoMesa)
+    public function destroy($id)
     {
         try {
-            $this->logInfo('Eliminando bloqueo', ['id' => $bloqueoMesa->id]);
+            $this->logInfo('Eliminando bloqueo', ['id' => $id]);
             
             // Eliminar relaciones con mesas
+            $bloqueoMesa = BloqueoMesa::findOrFail($id);
             if ($bloqueoMesa->affected_tables === 'specific') {
                 $bloqueoMesa->mesas()->detach();
             }
-            
+                
             // Eliminar el bloqueo
             $bloqueoMesa->delete();
             

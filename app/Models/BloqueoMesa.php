@@ -63,4 +63,21 @@ class BloqueoMesa extends Model
             'mesa_id'
         );
     }
+
+    public function toArray()
+    {
+        $array = parent::toArray();
+
+        // Forzar 'start_date' y 'end_date' como string tipo "YYYY-MM-DD"
+        $array['start_date'] = $this->start_date instanceof \Carbon\Carbon
+            ? $this->start_date->toDateString()
+            : $this->start_date;
+
+        $array['end_date'] = $this->end_date instanceof \Carbon\Carbon
+            ? $this->end_date->toDateString()
+            : $this->end_date;
+
+        return $array;
+    }
+
 }

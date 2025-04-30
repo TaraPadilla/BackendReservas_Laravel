@@ -40,6 +40,48 @@ Route::get('/enviar-prueba', function () {
     }
 });
 
+Route::get('/enviar-prueba-confirmacion', function () {
+    try {
+        // Busca una reserva de prueba (ajusta el ID si necesitas)
+        $reserva = Reserva::with(['mesa.sede.restaurante', 'cliente'])->find(82);
+
+        if (!$reserva) {
+            return 'No se encontró la reserva de prueba';
+        }
+
+        // Instancia tu servicio
+        $servicioCorreo = app(\App\Services\EmailService::class);
+
+        // Llama al método de confirmación de cliente
+        $enviado = $servicioCorreo->enviarCorreoConfirmacionCliente($reserva);
+
+        return $enviado ? 'Correo de confirmación enviado correctamente' : 'Error al enviar correo de confirmación';
+    } catch (\Exception $e) {
+        return 'Error al enviar: ' . $e->getMessage();
+    }
+});
+
+Route::get('/enviar-prueba-reserva', function () {
+    try {
+        // Busca una reserva que exista (puedes cambiar el ID al que quieras)
+        $reserva = Reserva::with(['mesa.sede.restaurante', 'cliente', 'combinacionMesa'])->find(80);
+
+        if (!$reserva) {
+            return 'No se encontró la reserva de prueba';
+        }
+
+        // Instancia tu servicio
+        $emailService = app(\App\Services\EmailService::class);
+
+        // Llama al método
+        $enviado = $emailService->enviarCorreoNotificacionAdmin($reserva);
+
+        return $enviado ? 'Correo de prueba enviado correctamente' : 'Error al enviar correo de prueba';
+    } catch (\Exception $e) {
+        return 'Error al enviar: ' . $e->getMessage();
+    }
+});
+
 // Ruta para cancelar reserva mediante enlace en correo
 Route::get('/reservas/cancelar/{id}', [ReservaController::class, 'cancelarReservaPorEnlace'])
     ->name('reservas.cancelar');

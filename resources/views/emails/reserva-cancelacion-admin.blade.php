@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Reserva Confirmada</title>
+  <title>Cancelación de reserva de mesa </title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -17,10 +17,7 @@
       padding: 20px;
       border-radius: 8px;
     }
-    .section {
-      margin-bottom: 20px;
-    }
-    h2, h3 {
+    h2 {
       text-align: center;
       color: #333;
       margin-top: 0;
@@ -31,6 +28,9 @@
     }
     strong {
       color: #222;
+    }
+    .section {
+      margin-bottom: 20px;
     }
     .footer {
       text-align: center;
@@ -44,25 +44,23 @@
 </head>
 <body>
   <div class="email-container">
-    <h2>Desde {{ $restaurante->nombre }}</h2>
-    <h3>{{ $sede->admin_nombre }}</h3>
+    <h2>Cancelación de reserva de mesa en {{ $sede->nombre }}</h2>
 
     <div class="section">
-      <p>Un cliente ha hecho una nueva reserva de mesa en {{ $sede->nombre }}. A continuación te dejo los detalles:</p>
+      <p>Hola {{ $sede->admin_nombre}},</p>
 
+      <p>Se ha cancelado una reserva de mesa.</p>
+
+      <p><strong>Dirección:</strong> {{ $sede->direccion }}, {{ $sede->ciudad }}</p>
       <p><strong>Fecha reserva:</strong> {{ \Carbon\Carbon::parse($reserva->fecha)->format('d/m/Y') }}</p>
       <p><strong>Hora reserva:</strong> {{ $reserva->hora_inicio }} - {{ $reserva->hora_fin }}</p>
       <p><strong>Número de personas:</strong> {{ $reserva->num_personas }}</p>
-      
-      @if($mesasCombinadas)
-        <p><strong>Mesas de la reserva:</strong> 
-            Mesa {{ $mesasCombinadas->pluck('numero')->implode(' y Mesa ') }}
-        </p>
-        @else
-        <p><strong>Mesa de la reserva:</strong> Mesa {{ $mesa->numero }}</p>
-        @endif
 
-      <p><strong>Dirección:</strong> {{ $sede->direccion }}, {{ $sede->ciudad }}</p>
+      @if(isset($mesasCombinadas) && $mesasCombinadas->isNotEmpty())
+        <p><strong>Mesas de la reserva:</strong> Mesa {{ $mesasCombinadas->pluck('numero')->implode(' y Mesa ') }}</p>
+      @else
+        <p><strong>Mesa de la reserva:</strong> Mesa {{ $mesa->numero }}</p>
+      @endif
     </div>
 
     <div class="section">
@@ -70,10 +68,6 @@
       <p><strong>Nombre:</strong> {{ $cliente->nombre }}</p>
       <p><strong>Teléfono:</strong> {{ $cliente->telefono }}</p>
       <p><strong>Email:</strong> {{ $cliente->email }}</p>
-    </div>
-
-    <div class="section">
-      <p>La reserva ha sido confirmada automáticamente. El cliente recibirá un email de confirmación con los detalles de su reserva.</p>
     </div>
 
     <div class="footer">

@@ -59,7 +59,8 @@ class SedeController extends Controller
                 'admin_nombre' => 'nullable|string|max:100',
                 'admin_email' => 'nullable|email|max:100',
                 'descripcion' => 'nullable|string',
-                'activo' => 'boolean|in:0,1,true,false,"true","false"'
+                'activo' => 'boolean|in:0,1,true,false,"true","false"',
+                'slug' => 'required|string|max:100'
             ]);
 
             // restaurante_id es 1 por defecto
@@ -156,7 +157,8 @@ class SedeController extends Controller
                 'admin_nombre' => 'nullable|string|max:100',
                 'admin_email' => 'nullable|email|max:100',
                 'descripcion' => 'nullable|string',
-                'activo' => 'boolean|in:0,1,true,false,"true","false"'
+                'activo' => 'boolean|in:0,1,true,false,"true","false"',
+                'slug' => 'string|max:100'
             ]);
 
             // Validar y guardar image_card si viene

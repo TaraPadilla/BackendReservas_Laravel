@@ -135,6 +135,14 @@
             <p>Por favor, contacta con el restaurante para obtener ayuda.</p>
         @endif
 
+        <div class="section">
+            <p>Si deseas realizar otra reserva, aquí está el enlace:</p>
+
+            <div style="text-align: center;">
+                <a href="{{ env('URL_FRONT') }}/{{ $sede->slug }}" class="link-button">Hacer nueva reserva</a>
+            </div>
+        </div>
+
         <div class="footer">
             <p>&copy; {{ date('Y') }} {{ isset($reserva) ? $reserva->mesa->sede->restaurante->nombre : 'Restaurante' }}. Todos los derechos reservados.</p>
         </div>

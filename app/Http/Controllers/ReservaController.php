@@ -15,6 +15,8 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
 use App\Models\SedeTextosLegales;
+use App\Http\Controllers\OcupacionController;
+
 
 class ReservaController extends Controller
 {
@@ -204,6 +206,11 @@ class ReservaController extends Controller
 
             $this->logInfo('Reserva creada exitosamente', ['reserva_id' => $reserva->id]);
 
+            // Crear ocupaciones asociadas a la reserva recién creada
+            $ocupacionController = new OcupacionController();
+            $ocupacionController->crearOcupacionesParaReserva($reserva, $mesaSeleccionada);
+
+
             $textos = SedeTextosLegales::where('sede_id', $reserva->sede_id ?? $mesaSeleccionada->sede_id ?? null)->first();
 
             $responseData = $reserva->load(['mesa', 'cliente', 'combinacionMesa']);
@@ -326,9 +333,13 @@ class ReservaController extends Controller
         //$reserva->deleted_at = now();
         $reserva->save();
     
-        // (Opcional) Enviar correo de notificación
-        // $this->emailService->enviarCorreoCancelacionCliente($reserva);
-    
+        //Cancelar las ocupaciones
+        $ocupacionController = new OcupacionController();
+        $ocupacionController->cancelarOcupacionesPorReserva($id);   
+        // Enviar correo de confirmación de cancelación
+        $this->emailService->enviarCorreoCancelacionCliente($reserva);
+        $this->emailService->enviarCorreoCancelacionAdmin($reserva);
+
         return response()->json([
             'message' => 'Reserva cancelada exitosamente por el administrador.',
             'reserva' => $reserva
@@ -440,12 +451,21 @@ class ReservaController extends Controller
             $reserva->save();
     
             $this->logInfo('Reserva cancelada exitosamente', ['reserva_id' => $id]);
+
+            //Cancelar las ocupaciones
+            $ocupacionController = new OcupacionController();
+            $ocupacionController->cancelarOcupacionesPorReserva($id);   
+            //Busca la sede de la reserva
+            $sede = $reserva->mesa->sede;
     
-            // // Enviar correo de confirmación de cancelación
-            // $this->emailService->enviarCorreoCancelacionCliente($reserva);
+            // Enviar correo de confirmación de cancelación
+            $this->emailService->enviarCorreoCancelacionCliente($reserva);
+            $this->emailService->enviarCorreoCancelacionAdmin($reserva);
+
             return view('reservas.cancelacion', [
                 'estado' => 'cancelada',
-                'reserva' => $reserva
+                'reserva' => $reserva,
+                'sede' => $sede
             ]);
         } catch (\Exception $e) {
             $this->logError('Error al cancelar reserva por enlace', $e);
